@@ -1,11 +1,19 @@
+''' 
+Boolean2Rules
 
+Requires a Boolean model, in the Booleannet format, as input.
+Outputs a PySB readable model including header information, Monomers
+Initials, Observables, and a set of Boolean rules in mass action format.
+'''
 from sys import argv
 import re
 import copy
-import datetime
-import profile
+import pydot
+from cStringIO import StringIO
+import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 
-class Node():
+class Node(): # define the node class for tree construction
     
     def __init__(self, function, function_nodes, id='', index=1):
         self.id = id
@@ -73,7 +81,7 @@ def constructTree(current_node): # expands the tree via Shannon expansion and co
         expression = " ".join(map(str, function))
         current_node.value = eval(expression)
         current_node.index_name = str(eval(expression))
- 
+
 def indexNodes(expansion, indexList=None):  # creates index for use in constructing the ROBDD from the tree
     if indexList == None:
         indexList = {}
@@ -169,7 +177,8 @@ def constructBDD(treeRoot): # constructs the ROBDD
         
     return BDDroot
 
-def computeTruthTable(function, nodes):
+def computeTruthTable(function, nodes): # computes a truth table for a Boolean function and a set of nodes
+                                        # gives us the initial leaf ordering for FindMinPathOrderHeap
      
     header = copy.deepcopy(nodes)
     header.append('result')
@@ -197,7 +206,6 @@ def computeTruthTable(function, nodes):
         value = eval(expression)
         table[i].append(value)       
     table.insert(0, header)
-    
     return table
 
 def LeafSwap(nodes, leaves, high, low): # rearranges leaves in accordance to the new node order
@@ -214,12 +222,14 @@ def LeafSwap(nodes, leaves, high, low): # rearranges leaves in accordance to the
                 ind = 1
             elif ind == 1:
                 ind = 0
-                leaves[(i*groupSize + j):(i*groupSize + j)+exchangeSize], leaves[(i*groupSize + j)+groupSize/2-exchangeSize:(i*groupSize + j)+groupSize/2] = leaves[(i*groupSize + j)+groupSize/2-exchangeSize:(i*groupSize + j)+groupSize/2],leaves[(i*groupSize + j):(i*groupSize + j)+exchangeSize]
+                leaves[(i*groupSize + j):(i*groupSize + j)+exchangeSize], leaves[(i*groupSize + j)+groupSize/2-exchangeSize:(i*groupSize + j)+groupSize/2] = \
+                leaves[(i*groupSize + j)+groupSize/2-exchangeSize:(i*groupSize + j)+groupSize/2],leaves[(i*groupSize + j):(i*groupSize + j)+exchangeSize]
 
     return leaves   
 
 def FindMinPathOrderHeap(functions, nodes): # determines a variable order for the minimum number of BDD paths using Heap's algorithm; this is a brute force method 
     
+    # initial path reduction count
     newNodes = {}
     for key in functions:
         newNodes[key] = copy.deepcopy(nodes[key])
@@ -251,6 +261,8 @@ def FindMinPathOrderHeap(functions, nodes): # determines a variable order for th
             pathcount += int(each)
         index = [0 for i in range(N)]
         i = 1
+        
+        # run through all permutations of node order while counting path reduction
         while i < N:
             if index[i] < i:
                 swap = i % 2 * index[i]
@@ -279,6 +291,7 @@ def FindMinPathOrderHeap(functions, nodes): # determines a variable order for th
                 if paths < pathcount:
                     pathcount = paths
                     newNodes[key] = copy.deepcopy(nodes[key])
+                    
                 index[i] += 1
                 i = 1
             else:
@@ -349,12 +362,12 @@ def listRules(root):    # lists the rules from the paths in a BDD (or tree)
                 j2[place+1] = '0'
                 rule2 = ''
                 for k,l in enumerate(j2[:-1]):
-                    if k % 2 == 0:            
+                    if k % 2 == 0:
                         rule2 += str(l)+'(state = \''
                     if k % 2 == 1 and k != len(j2)-2:
                         rule2 += str(l)+'\') + '
                     if k % 2 == 1 and k == len(j2)-2:
-                        rule2 += str(l)+'\')'                
+                        rule2 += str(l)+'\')'
                 rule = 'Rule(\''+function_node+str(i)+'\', '+rule+' >> '+rule2+', on)'
         if print_rule == True:
             outfile.write(rule+'\n')
@@ -372,6 +385,60 @@ def grove(functions, function_nodes): # groups all BDDs (or trees)
         bdd_list.append(bdd_root)
         
     return bdd_list
+
+def displayIndex(expansion, indexList=None):  # creates index for use in printTree
+
+    if indexList is None:
+        indexList = {}
+    if expansion != None:
+        if expansion.index in indexList:        
+            present = False
+            for j in indexList[expansion.index]:
+                if j == expansion:
+                    present = True
+            if present == False:
+                indexList[expansion.index].append(expansion)
+                displayIndex(expansion.getTrueNode(), indexList)
+                displayIndex(expansion.getFalseNode(), indexList)
+        else:
+            indexList[expansion.index] = []                
+            present = False
+            for j in indexList[expansion.index]:
+                if j == expansion:
+                    present = True
+            if present == False:
+                indexList[expansion.index].append(expansion)
+                displayIndex(expansion.getTrueNode(), indexList)
+                displayIndex(expansion.getFalseNode(), indexList)
+                
+    return indexList
+
+def printTree(expansion):   # utility for displaying the ROBDD
+                            # usage: printTree(constructBDD(Node(function, node_list)))
+    
+    indexList = displayIndex(expansion)
+    nodeList = []
+    graph = pydot.Dot(graph_type='digraph')
+    for i,j in enumerate(indexList, 1):
+        for k,l in enumerate(indexList[i]):
+            node = pydot.Node(indexList[i][k].index_name+indexList[i][k].id)
+            node.set('label', indexList[i][k].index_name)
+            node.set('rank', indexList[i][k].index)
+            graph.add_node(node)
+        for k,l in enumerate(indexList[i]):
+            if i != len(indexList):
+                graph.add_edge(pydot.Edge(pydot.Node(indexList[i][k].index_name+indexList[i][k].id), pydot.Node(indexList[i][k].true_node.index_name+indexList[i][k].true_node.id), label='1'))
+                graph.add_edge(pydot.Edge(pydot.Node(indexList[i][k].index_name+indexList[i][k].id), pydot.Node(indexList[i][k].false_node.index_name+indexList[i][k].false_node.id), label='0'))
+
+    png = graph.create_png(prog='dot')
+    sio = StringIO()
+    sio.write(png)
+    sio.seek(0)
+    img = mpimg.imread(sio)
+    imgplot = plt.imshow(img)
+    plt.axis('off')
+    plt.tight_layout()
+    plt.show()
 
 # read and tokenize the Boolean model
 Boolean_model = open(argv[2], 'r')
@@ -417,19 +484,15 @@ for line in Boolean_model: # checks for 'rules' text block between triple quotes
                     initial_states[node] = initial
                     all_nodes.append(node)
 
+orderedNodes = FindMinPathOrderHeap(functions, function_nodes) # minimize the ROBDD paths
 
-
-# find the optimal ordering of nodes for each Boolean function
-orderedNodes = FindMinPathOrderHeap(functions, function_nodes)
-
-# print Monomers, Observables, etc.
-outfile = open('test.py', 'w')
+# write model header, Monomers, Initials, and Observables
+out_name = 'B2R_' + argv[2]
+outfile = open(out_name, 'w')
 outfile.write('\nfrom pysb import *\n\n')
 outfile.write('Model()\n\n')
 for key in sorted(initial_states):
     outfile.write('Monomer(\''+key+'\', [\'state\'], {\'state\': [\'0\', \'1\']})\n')
-outfile.write('\nParameter(\'on\', 1)\n')
-outfile.write('Parameter(\'off\', 0)\n\n')
 for key in sorted(initial_states):
     init = None
     if initial_states[key] == 'True':
@@ -449,48 +512,11 @@ for key in sorted(initial_states):
     outfile.write('Observable(\''+key+'1_obs\', '+key+'(state = \'1\'))')
     outfile.write('\n')
 outfile.write('\n')
-
-# print Rules
+ 
+# write Rules
 BDDs = grove(functions, orderedNodes)   
 for each in BDDs:
     listRules(each)
     outfile.write('\n') 
-       
+        
 outfile.close()  
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
