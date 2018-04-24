@@ -1,643 +1,124 @@
-
-from pysb.integrate import Solver
-from pysb.bng import run_ssa
-from sympy import sympify
 from Model_SPN import model
-from pysb.bng import generate_equations
 from pysb.integrate import odesolve
 import numpy as np
-#from sys import argv
 import matplotlib.pyplot as plt
 import matplotlib.patches as patches
+import matplotlib.animation as animation
+from matplotlib.cm import ScalarMappable
 
-t=np.linspace(0, 500, 501)
-#===============================================================================
-# with open("Ingeneue_time", "r") as ins:
-#     t = []
-#     for line in ins:
-#         t.append(float(line.rstrip('\n')))
-#===============================================================================
-#t = [float(line.rstrip('\n')) for line in open('Ingeneue_time')]
+sp_names = ['en', 'EN', 'wg', 'IWG', 'EWG', 'ptc', 'PTC', 'ci', 'CI', 'CN', 'hh', 'HH', 'PH']
+n_cells = 4
 
-#generate_equations(model, verbose = True)
-x = odesolve(model, t, verbose=True)
-#x = run_ssa(model, t[-1], len(t)-1, verbose=True)
-#print model.parameters
- #==============================================================================
- # for ode in model.odes:
- #     print ode
- #==============================================================================
-#print x["hh_1_obs"]
-EWG_1 = x["EWG_1_1_obs"][100] + x["EWG_1_2_obs"][100] + x["EWG_1_3_obs"][100] + x["EWG_1_4_obs"][100] + x["EWG_1_5_obs"][100] + x["EWG_1_6_obs"][100]
-EWG_2 = x["EWG_2_1_obs"][100] + x["EWG_2_2_obs"][100] + x["EWG_2_3_obs"][100] + x["EWG_2_4_obs"][100] + x["EWG_2_5_obs"][100] + x["EWG_2_6_obs"][100]
-EWG_3 = x["EWG_3_1_obs"][100] + x["EWG_3_2_obs"][100] + x["EWG_3_3_obs"][100] + x["EWG_3_4_obs"][100] + x["EWG_3_5_obs"][100] + x["EWG_3_6_obs"][100]
-EWG_4 = x["EWG_4_1_obs"][100] + x["EWG_4_2_obs"][100] + x["EWG_4_3_obs"][100] + x["EWG_4_4_obs"][100] + x["EWG_4_5_obs"][100] + x["EWG_4_6_obs"][100]
-print EWG_1
-print EWG_2
-print EWG_3
-print EWG_4
-PTC_1 = x["PTC_1_1_obs"][100] + x["PTC_1_2_obs"][100] + x["PTC_1_3_obs"][100] + x["PTC_1_4_obs"][100] + x["PTC_1_5_obs"][100] + x["PTC_1_6_obs"][100]
-PTC_2 = x["PTC_2_1_obs"][100] + x["PTC_2_2_obs"][100] + x["PTC_2_3_obs"][100] + x["PTC_2_4_obs"][100] + x["PTC_2_5_obs"][100] + x["PTC_2_6_obs"][100]
-PTC_3 = x["PTC_3_1_obs"][100] + x["PTC_3_2_obs"][100] + x["PTC_3_3_obs"][100] + x["PTC_3_4_obs"][100] + x["PTC_3_5_obs"][100] + x["PTC_3_6_obs"][100]
-PTC_4 = x["PTC_4_1_obs"][100] + x["PTC_4_2_obs"][100] + x["PTC_4_3_obs"][100] + x["PTC_4_4_obs"][100] + x["PTC_4_5_obs"][100] + x["PTC_4_6_obs"][100]
-print PTC_1
-print PTC_2
-print PTC_3
-print PTC_4
-HH_1 = x["HH_1_1_obs"][100] + x["HH_1_2_obs"][100] + x["HH_1_3_obs"][100] + x["HH_1_4_obs"][100] + x["HH_1_5_obs"][100] + x["HH_1_6_obs"][100]
-HH_2 = x["HH_2_1_obs"][100] + x["HH_2_2_obs"][100] + x["HH_2_3_obs"][100] + x["HH_2_4_obs"][100] + x["HH_2_5_obs"][100] + x["HH_2_6_obs"][100]
-HH_3 = x["HH_3_1_obs"][100] + x["HH_3_2_obs"][100] + x["HH_3_3_obs"][100] + x["HH_3_4_obs"][100] + x["HH_3_5_obs"][100] + x["HH_3_6_obs"][100]
-HH_4 = x["HH_4_1_obs"][100] + x["HH_4_2_obs"][100] + x["HH_4_3_obs"][100] + x["HH_4_4_obs"][100] + x["HH_4_5_obs"][100] + x["HH_4_6_obs"][100]
-#-------------------------------------------------------------------- print HH_1
-#-------------------------------------------------------------------- print HH_2
-#-------------------------------------------------------------------- print HH_3
-print HH_4
-PH_1 = x["PH_1_1_obs"][100] + x["PH_1_2_obs"][100] + x["PH_1_3_obs"][100] + x["PH_1_4_obs"][100] + x["PH_1_5_obs"][100] + x["PH_1_6_obs"][100]
-PH_2 = x["PH_2_1_obs"][100] + x["PH_2_2_obs"][100] + x["PH_2_3_obs"][100] + x["PH_2_4_obs"][100] + x["PH_2_5_obs"][100] + x["PH_2_6_obs"][100]
-PH_3 = x["PH_3_1_obs"][100] + x["PH_3_2_obs"][100] + x["PH_3_3_obs"][100] + x["PH_3_4_obs"][100] + x["PH_3_5_obs"][100] + x["PH_3_6_obs"][100]
-PH_4 = x["PH_4_1_obs"][100] + x["PH_4_2_obs"][100] + x["PH_4_3_obs"][100] + x["PH_4_4_obs"][100] + x["PH_4_5_obs"][100] + x["PH_4_6_obs"][100]
+tspan = np.linspace(0, 1000, 501)
+x = odesolve(model, tspan, verbose=True, integrator_options = {'atol' : 1e-6, 'rtol' : 1e-6})
 
-print PH_1
-print PH_2
-print PH_3
-print PH_4
+EWG = [sum(x['EWG_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]
+PTC = [sum(x['PTC_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]
+HH =  [sum(x['HH_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]
+PH =  [sum(x['PH_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]
 
-#===============================================================================
-# maxPH = max(PH_1, PH_2, PH_3, PH_4)
-# 
-# PH_1 = PH_1/maxPH
-# PH_2 = PH_2/maxPH
-# PH_3 = PH_3/maxPH
-# PH_4 = PH_4/maxPH
-#===============================================================================
+names2_dict = {'EWG' : EWG, 'PTC' : PTC, 'HH'  : HH, 'PH'  : PH}
 
-
-
-print x["en_1_obs"][100]
-print x["en_2_obs"][100]
-print x["en_3_obs"][100]
-print x["en_4_obs"][100]
-print x["EN_1_obs"][100]
-print x["EN_2_obs"][100]
-print x["EN_3_obs"][100]
-print x["EN_4_obs"][100]
-print x["wg_1_obs"][100]
-print x["wg_2_obs"][100]
-print x["wg_3_obs"][100]
-print x["wg_4_obs"][100]
-print x["IWG_1_obs"][100]
-print x["IWG_2_obs"][100]
-print x["IWG_3_obs"][100]
-print x["IWG_4_obs"][100]
-print x["ptc_1_obs"][100]
-print x["ptc_2_obs"][100]
-print x["ptc_3_obs"][100]
-print x["ptc_4_obs"][100]
-print x["ci_1_obs"][100]
-print x["ci_2_obs"][100]
-print x["ci_3_obs"][100]
-print x["ci_4_obs"][100]
-print x["CI_1_obs"][100]
-print x["CI_2_obs"][100]
-print x["CI_3_obs"][100]
-print x["CI_4_obs"][100]
-print x["CN_1_obs"][100]
-print x["CN_2_obs"][100]
-print x["CN_3_obs"][100]
-print x["CN_4_obs"][100]
-print x["hh_1_obs"][100]
-print x["hh_2_obs"][100]
-print x["hh_3_obs"][100]
-print x["hh_4_obs"][100]
-
-fig1 = plt.figure(figsize=(5.1, 15))
+# create figure
+fig1 = plt.figure(figsize=(20,20)) #figsize=(5.1, 15))
 ax1 = fig1.add_subplot(111, aspect='equal')
-
 ax1.axes.get_xaxis().set_visible(False)
 ax1.axes.get_yaxis().set_visible(False)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, 5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["en_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, 5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["en_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, 5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["en_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, 5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["en_4_obs"][100], 1)
-    )            
-)
+ax1.axis([-3, 16, -27.5, 6.5])
 
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, 2.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["EN_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, 2.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["EN_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, 2.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["EN_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, 2.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,           # radius
-        np.pi/6,
-        alpha = min(x["EN_4_obs"][100], 1)
-    )            
-)
+cmap = plt.get_cmap('bwr') # blue-white-red colormap
 
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, 0),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["wg_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, 0 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["wg_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, 0),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["wg_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, 0 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["wg_4_obs"][100], 1)
-    )            
-)
+# add cells (hexagons)
+y_coord = 5
+for name in sp_names:
+    x_coord = 2
+    for cell in range(n_cells):
+        if name in names2_dict.keys():
+            obs = names2_dict[name][cell]
+        else:
+            obs = x["%s_%d_obs" % (name, cell+1)]
+        ax1.add_patch(
+            patches.RegularPolygon(
+                (x_coord, y_coord - (cell % 2)*np.cos(np.pi/6)),  # (x,y)
+                6,          # number of vertices
+                1,          # radius
+                np.pi/6,
+                ec='k',
+                fc=cmap(obs[0])
+            )
+        )
+        x_coord += 1.5
+        ax1.annotate(name, xy=(-2.5, y_coord - np.cos(np.pi/6)/2), fontsize = 25)
+    y_coord -= 2.5
 
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -2.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["IWG_4_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -2.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["IWG_4_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -2.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["IWG_4_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -2.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["IWG_4_obs"][100], 1)
-    )            
-)
+# add current time 
+time_text = ax1.text(8,4,'t = %g' % tspan[0], fontsize = 25, color='r')
 
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(EWG_1, 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(EWG_2, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(EWG_3, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(EWG_4, 1)
-    )            
-)
+# add colorbar
+sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=1))
+sm._A = []
+cbaxes = fig1.add_axes([0.58, 0.05, 0.03, 0.8]) # [left, bottom, width, height] -- fractions of plotting area between 0 and 1
+cb = plt.colorbar(sm, cax=cbaxes)
+cb.ax.tick_params(labelsize=20)
+cb.ax.set_ylabel('Scaled concentration', fontsize=20, labelpad=-100)
 
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -7.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ptc_4_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -7.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ptc_4_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -7.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ptc_4_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -7.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ptc_4_obs"][100], 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -10),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PTC_1, 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -10 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PTC_2, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -10),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PTC_3, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -10 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PTC_4, 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -12.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ci_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -12.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ci_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -12.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ci_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -12.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["ci_4_obs"][100], 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -15),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CI_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -15 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CI_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -15),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CI_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -15 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CI_4_obs"][100], 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -17.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CN_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -17.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CN_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -17.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CN_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -17.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["CN_4_obs"][100], 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -20),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["hh_1_obs"][100], 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -20 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["hh_2_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -20),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["hh_3_obs"][100], 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -20 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(x["hh_4_obs"][100], 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -22.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(HH_1, 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -22.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(HH_2, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -22.5),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(HH_3, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -22.5 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(HH_4, 1)
-    )            
-)
-
-ax1.add_patch(
-    patches.RegularPolygon(
-        (2, -25),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PH_1, 1)
-    )
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (3.5, -25 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PH_2, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (5, -25),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PH_3, 1)
-    )            
-)
-ax1.add_patch(
-    patches.RegularPolygon(
-        (6.5, -25 - np.cos(np.pi/6)),     # (x,y)
-        6,              # number of vertices
-        1,            # radius
-        np.pi/6,
-        alpha = min(PH_4, 1)
-    )            
-)
-
-plt.annotate('en', xy=(-1.25, 5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('EN', xy=(-1.25, 2.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('wg', xy=(-1.25, 0 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('IWG', xy=(-1.25, -2.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('EWG', xy=(-1.25, -5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('ptc', xy=(-1.25, -7.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('PTC', xy=(-1.25, -10 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('ci', xy=(-1.25, -12.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('CI', xy=(-1.25, -15 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('CN', xy=(-1.25, -17.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('hh', xy=(-1.25, -20 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('HH', xy=(-1.25, -22.5 - np.cos(np.pi/6)/2), fontsize = 25)
-plt.annotate('PH', xy=(-1.25, -25 - np.cos(np.pi/6)/2), fontsize = 25)
-
-
-plt.axis([-2, 8, -27.5, 6.5])
 plt.tight_layout()
+
+def animate(t):
+    time_text.set_text('t = %g' % tspan[t])
+    i = 0
+    for name in sp_names:
+        for cell in range(n_cells):
+            if name in names2_dict.keys():
+                obs = names2_dict[name][cell]
+            else:
+                obs = x["%s_%d_obs" % (name, cell+1)]
+            ax1.patches[i].set_fc(cmap(obs[t]))
+            i += 1   
+    return ax1.patches + [time_text]
+
+ani = animation.FuncAnimation(fig1, animate, range(len(tspan)), interval=25, blit=True, repeat=False) 
+
+print 'Saving animation...'
+ani.save('anim.mp4', writer='ffmpeg')
+# ani.save('anim.gif', writer='imagemagick')
+print 'Done'
+
+##### Plot time courses #####
+
+# DATA FROM INGENUE 
+data = np.genfromtxt('TEMP/SPN_Ingenue.txt', names = ['pset', 'time', 'cell', 'species', 'conc'])
+
+y_time = [data['time'][i] for i in range(len(data['time'])) if 
+        data['species'][i] == 0 and 
+        data['cell'][i] == 0]
+
+y = {}
+for i,sp in enumerate(sp_names):
+    for j in range(n_cells):
+        y['%s_%d' % (sp,j+1)] = [data['conc'][k] for k in range(len(data['conc'])) if 
+        data['species'][k] == i and 
+        data['cell'][k] == j]
+
+# Plot our results vs. Ingenue's
+for name in sp_names:
+    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)
+    n = 1
+    for i in range(2):
+        for j in range(2):
+            if name in names2_dict.keys():
+                yvals = names2_dict[name][n-1]
+            else:
+                yvals = x['%s_%d_obs' % (name, n)]
+            axes[i,j].plot(tspan, yvals, lw=4, color='r', label='%s_%d' % (name, n))
+            axes[i,j].plot(y_time, y['%s_%d' % (name, n)], 'ob', mfc='None')
+            axes[i,j].legend(loc=0)
+            if i==1:
+                axes[i,j].set_xlabel('time')
+            if j==0:
+                axes[i,j].set_ylabel('scaled conc')            
+            n += 1
+    plt.tight_layout()
+#####
+
 plt.show()
-
-
-
-#===============================================================================
-# for i,sp in enumerate(model.species):
-#     print i,sp
-# print
-# 
-# for i,rxn in enumerate(model.reactions):
-#     print i,rxn
-# print
-# for i,ode in enumerate(model.odes):
-#     print i,ode
-# print
-# 
-# for i,exp in enumerate(model.expressions):
-#     print i,exp
-#     print exp.expand_expr()
-# print
-#===============================================================================
-
-
-#------------------------------------- exp2 = model.expressions["Hill_EWG_nT_1"]
-#-------------------------------------------------------------------- print exp2
-#------------------------------------------------------ print exp2.expand_expr()
-
-
