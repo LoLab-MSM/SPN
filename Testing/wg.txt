@@ -1,0 +1,7 @@
+wg = False
+pWG = False
+CIA = True
+SLP = True
+CIR = False
+
+1: wg* = ( CIA and SLP or pWG and (CIA or SLP) ) and not CIR

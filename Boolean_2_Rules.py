@@ -32,11 +32,13 @@ class Node(): # define the node class for tree construction
 
     def getTrueNode(self):
         return self.true_node
+    
     def getFalseNode(self):
         return self.false_node
             
     def insertTrue(self, true_function, reduced_node_set, true_id, index):
         self.true_node = Node(true_function, reduced_node_set, true_id, index)
+        
     def insertFalse(self, false_function, reduced_node_set, false_id, index):
         self.false_node = Node(false_function, reduced_node_set, false_id, index)
 
@@ -178,7 +180,7 @@ def constructBDD(treeRoot): # constructs the ROBDD
     return BDDroot
 
 def computeTruthTable(function, nodes): # computes a truth table for a Boolean function and a set of nodes
-                                        # gives us the initial leaf ordering for FindMinPathOrderHeap
+                                        # gives us the initial leaf ordering for findMinPathOrderHeap
      
     header = copy.deepcopy(nodes)
     header.append('result')
@@ -208,7 +210,7 @@ def computeTruthTable(function, nodes): # computes a truth table for a Boolean f
     table.insert(0, header)
     return table
 
-def LeafSwap(nodes, leaves, high, low): # rearranges leaves in accordance to the new node order
+def leafSwap(nodes, leaves, high, low): # rearranges leaves in accordance to the new node order
     
     l = leaves[:]
     lenN = len(nodes)
@@ -227,7 +229,7 @@ def LeafSwap(nodes, leaves, high, low): # rearranges leaves in accordance to the
 
     return leaves   
 
-def FindMinPathOrderHeap(functions, nodes): # determines a variable order for the minimum number of BDD paths using Heap's algorithm; this is a brute force method 
+def findMinPathOrderHeap(functions, nodes): # determines a variable order for the minimum number of BDD paths using Heap's algorithm; this is a brute force method 
     
     # initial path reduction count
     newNodes = {}
@@ -266,7 +268,7 @@ def FindMinPathOrderHeap(functions, nodes): # determines a variable order for th
         while i < N:
             if index[i] < i:
                 swap = i % 2 * index[i]
-                leaves = LeafSwap(nodes[key], leaves, swap+1, i+1)
+                leaves = leafSwap(nodes[key], leaves, swap+1, i+1)
                 marks = [1]*(lenLeaves)
                 for each in range(N):
                     set_size = 2**each
@@ -440,8 +442,10 @@ def printTree(expansion):   # utility for displaying the ROBDD
     plt.tight_layout()
     plt.show()
 
+###########################################
+
 # read and tokenize the Boolean model
-Boolean_model = open(argv[2], 'r')
+Boolean_model = open(argv[1], 'r')
 
 all_nodes = []          # list of all nodes in system
 initial_states = {}     # initial states for each node
@@ -450,6 +454,7 @@ functions = {}          # tokenized list of all nodes, operations, and parenthes
 
 in_rules = False
 for line in Boolean_model: # checks for 'rules' text block between triple quotes
+#     print line
     if re.match('.*"""', line,) and in_rules == False:
         in_rules = True
     if re.match('"""', line,) and in_rules == True:
@@ -457,6 +462,7 @@ for line in Boolean_model: # checks for 'rules' text block between triple quotes
 
     if in_rules == True: # extract tokens for each Boolean function
         if re.match('.*\*.*', line):
+#             print line
             line = line.replace('(', '( ')
             line = line.replace(')', ' )')
             for dNode in all_nodes:
@@ -476,7 +482,9 @@ for line in Boolean_model: # checks for 'rules' text block between triple quotes
                     function_list = token_list[index_of_eq+1:]
                     functions[dNode] = function_list
         else:       # extract initial states
-            if line.rstrip('\n')[-4:] == 'True' or line.rstrip('\n')[-5:] == 'False' or line.rstrip('\n')[-6:] == 'Random':
+#             if line.rstrip('\n')[-4:] == 'True' or line.rstrip('\n')[-5:] == 'False' or line.rstrip('\n')[-6:] == 'Random':
+            if re.search('True|False|Random', line):
+                print line
                 line_list = re.split('\s*=\s*', line.rstrip('\n'))
                 initial = line_list[-1]
                 line_list = line_list[:-1]
@@ -484,10 +492,10 @@ for line in Boolean_model: # checks for 'rules' text block between triple quotes
                     initial_states[node] = initial
                     all_nodes.append(node)
 
-orderedNodes = FindMinPathOrderHeap(functions, function_nodes) # minimize the ROBDD paths
+orderedNodes = findMinPathOrderHeap(functions, function_nodes) # minimize the ROBDD paths
 
 # write model header, Monomers, Initials, and Observables
-out_name = 'B2R_' + argv[2]
+out_name = 'B2R_' + argv[1]
 outfile = open(out_name, 'w')
 outfile.write('\nfrom pysb import *\n\n')
 outfile.write('Model()\n\n')

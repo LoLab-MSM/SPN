@@ -21,7 +21,7 @@ ci_mRNA_1 = False
 CI_1 = False
 CIA_1 = False
 CIR_1 = False
-
+ 
 SLP_2 = False
 wg_mRNA_2 = False
 WG_2 = False
@@ -37,7 +37,7 @@ ci_mRNA_2 = True
 CI_2 = False
 CIA_2 = False
 CIR_2 = False
-
+ 
 SLP_3 = True
 wg_mRNA_3 = False
 WG_3 = False
@@ -53,7 +53,7 @@ ci_mRNA_3 = True
 CI_3 = False
 CIA_3 = False
 CIR_3 = False
-
+ 
 SLP_4 = True
 wg_mRNA_4 = True
 WG_4 = False
@@ -165,6 +165,7 @@ for i,state in enumerate(stateList):
 
 column_labels = list('1234')
 row_labels = nodeList
+
 string = ''
 
 for node in cell_1_states:
@@ -202,18 +203,37 @@ string = string[:-1]
 data = np.matrix(string).T
 data = np.array(data)
 
+row_labels = np.array(row_labels)
+
+############
+# print np.where(row_labels == 'wg_mRNA')[0][0]
+# ordered_row_labels = ['wg_mRNA', 'WG', 'en_mRNA', 'EN', 'hh_mRNA', 'HH', 'ptc_mRNA', 'PTC', 'PH', 'SMO', 'ci_mRNA', 'CI', 'CIA', 'CIR']
+ordered_row_labels = ['en_mRNA', 'EN', 'wg_mRNA', 'WG', 'ptc_mRNA', 'PTC', 'ci_mRNA', 'CI', 'CIR', 'hh_mRNA', 'HH', 'PH', 'SMO', 'CIA']
+# ordered_row_labels = ['CIA', 'CIR', 'CI', 'EN', 'HH', 'PH', 'PTC', 'SMO', 'WG', 'ci_mRNA', 'en_mRNA', 'hh_mRNA', 'ptc_mRNA', 'wg_mRNA']
+ordered_data = []
+for label in ordered_row_labels:
+    index = np.where(row_labels == label)[0][0]
+    ordered_data.append(data[index])
+ordered_data = np.array(ordered_data)
+############
+
 fig, ax = plt.subplots()
-heatmap = ax.pcolor(data, cmap=plt.cm.Blues, edgecolors='black', linewidths=.2)
+# heatmap = ax.pcolor(data, cmap=plt.cm.Blues, edgecolors='black', linewidths=.2)
+heatmap = ax.pcolor(ordered_data, cmap=plt.cm.Blues, edgecolors='black', linewidths=.2)
 
-ax.set_xticks(np.arange(data.shape[1]) + 0.5, minor = False)
-ax.set_yticks(np.arange(data.shape[0]) + 0.5, minor = False)
+# ax.set_xticks(np.arange(data.shape[1]) + 0.5, minor = False)
+# ax.set_yticks(np.arange(data.shape[0]) + 0.5, minor = False)
+ax.set_xticks(np.arange(ordered_data.shape[1]) + 0.5, minor = False)
+ax.set_yticks(np.arange(ordered_data.shape[0]) + 0.5, minor = False)
 
-plt.ylim(0,len(row_labels))
+# plt.ylim(0,len(row_labels)
+plt.ylim(0,len(ordered_row_labels))
 ax.invert_yaxis()
 ax.xaxis.tick_top()
 
 ax.set_xticklabels(column_labels, minor=False)
-ax.set_yticklabels(row_labels, minor=False)
+# ax.set_yticklabels(row_labels, minor=False)
+# ax.set_yticklabels(ordered_row_labels, minor=False)
+ax.set_yticklabels([label.split('_')[0] for label in ordered_row_labels], minor=False)
+
 plt.show()
-
-

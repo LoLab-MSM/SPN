@@ -17,11 +17,11 @@ Parameter('rate_A', 1.0)
 Parameter('rate_B', 1.0)
 Parameter('rate_C', 1.0)
 
-Observable('A_off_obs', A(state='off'))
+# Observable('A_off_obs', A(state='off'))
 Observable('A_on_obs', A(state='on'))
-Observable('B_off_obs', B(state='off'))
+# Observable('B_off_obs', B(state='off'))
 Observable('B_on_obs', B(state='on'))
-Observable('C_off_obs', C(state='off'))
+# Observable('C_off_obs', C(state='off'))
 Observable('C_on_obs', C(state='on'))
 
 # Initials

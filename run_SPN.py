@@ -6,6 +6,8 @@ import matplotlib.patches as patches
 import matplotlib.animation as animation
 from matplotlib.cm import ScalarMappable
 
+plt.rcParams['animation.ffmpeg_path'] = '/opt/local/bin/ffmpeg'
+
 sp_names = ['en', 'EN', 'wg', 'IWG', 'EWG', 'ptc', 'PTC', 'ci', 'CI', 'CN', 'hh', 'HH', 'PH']
 n_cells = 4
 
@@ -79,13 +81,13 @@ def animate(t):
 
 ani = animation.FuncAnimation(fig1, animate, range(len(tspan)), interval=25, blit=True, repeat=False) 
 
-print 'Saving animation...'
-ani.save('anim.mp4', writer='ffmpeg')
+print('Saving animation...')
+ani.save('anim.mp4') #, writer='ffmpeg')
 # ani.save('anim.gif', writer='imagemagick')
-print 'Done'
+print('Done')
 
 ##### Plot time courses #####
-
+'''
 # DATA FROM INGENUE 
 data = np.genfromtxt('TEMP/SPN_Ingenue.txt', names = ['pset', 'time', 'cell', 'species', 'conc'])
 
@@ -120,5 +122,5 @@ for name in sp_names:
             n += 1
     plt.tight_layout()
 #####
-
+'''
 plt.show()
