@@ -19,15 +19,22 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
     
     H_en = model1.parameters['H_en']
     ktr_en = model1.parameters['ktr_en']
-    
+    H_wg = model1.parameters['H_wg']
+    H_WG = model1.parameters['H_WG']
+    H_EWG = model1.parameters['H_EWG']
+    H_ci = model1.parameters['H_ci']
+    H_CI = model1.parameters['H_CI']
+    H_CN = model1.parameters['H_CN']
+
     tspan = np.linspace(0, 1000, 501)
     sim = ScipyOdeSimulator(model1, tspan, verbose=False)
     sim2 = ScipyOdeSimulator(model2, tspan, verbose=False, integrator_options = {'atol' : 1e-6, 'rtol' : 1e-6})
     
     n_samples = 100
 #     EWG_init = np.linspace(1./n_samples, 1, n_samples) #1
-    EWG_init = np.linspace(0,1,11) #[1]
+    EWG_init = np.linspace(0,8,11) #[1]
     CN_init = [6] #np.linspace(0,6,101) #np.linspace(6./n_samples, 6, n_samples) #6
+    CN_init = np.linspace(0,1,11) #np.linspace(6./n_samples, 6, n_samples) #6
     
     mEN_final = np.zeros((len(EWG_init), len(CN_init)))
     pEWG_final = np.zeros((len(EWG_init), len(CN_init)))
@@ -39,13 +46,15 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
         for j,c in enumerate(CN_init):
             print('(%s, %g): %d.%d' % (nu_wg, nu_cn, i, j))
             # Simulate full model
-            x = sim.run(initials={model1.initial_conditions[1][0] : e/H_en.value, \
-                                  model1.initial_conditions[2][0] : c/H_en.value})
-            scaled_mEN = x.observables['mEN_obs']*H_en.value/ktr_en.value
-            scaled_pEWG = x.observables['pEWG_free']*H_en.value
+            x = sim.run(initials={model1.initial_conditions[0][0] : e, \
+                                  model1.initial_conditions[1][0] : c})
+            mEN = x.observables['mEN_obs']
+            pEWG = x.observables['pEWG_free']
+            scaled_pEWG = pEWG * H_wg.value * H_WG.value # H's are already divisors (see en.py)
 #             scaled_pEWG = (x.observables['pEWG_free'] + x.observables['pEWG_pCN'])*H_en.value
-            scaled_pCN = x.observables['pCN_free']*H_en.value
-            mEN_final[i][j] = scaled_mEN[-1]
+            pCN = x.observables['pCN_free']
+            scaled_pCN = pCN * H_ci.value * H_CI.value # also already divisors
+            mEN_final[i][j] = mEN[-1]
             pEWG_final[i][j] = scaled_pEWG[-1]
             pCN_final[i][j] = scaled_pCN[-1]
             # Simulate reduced model
@@ -55,7 +64,12 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
                 en_final[i][j] = x.observables['en_obs'][-1]
             else:
                 en_final[i][j] = float('nan')
-    
+            plt.plot(tspan,mEN,label='MA en')
+            plt.plot(tspan,x.observables['en_obs'],label='vD en')
+            plt.legend()
+            plt.show()
+
+
     plt.figure()
     if len(CN_init) == 1:
         plt.plot(pEWG_final, mEN_final, color='0.5', lw=2)
