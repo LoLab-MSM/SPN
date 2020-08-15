@@ -4,6 +4,7 @@ from pysb.simulator import ScipyOdeSimulator
 import en
 from en_Hill import model as model2
 from itertools import product
+import sys
 
 nu_WGen = [8] #[8.195488]
 nu_CNen = [6] #[5.929026]
@@ -13,7 +14,8 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
     
     en.create_model(nu_wg, nu_cn)
     model1 = en.model
-        
+
+
     model2.parameters['nu_WGen'].value = model1.parameters['nu_WGen'].value
     model2.parameters['nu_CNen'].value = model1.parameters['nu_CNen'].value
     
@@ -31,45 +33,88 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
     sim2 = ScipyOdeSimulator(model2, tspan, verbose=False, integrator_options = {'atol' : 1e-6, 'rtol' : 1e-6})
     
     n_samples = 100
-#     EWG_init = np.linspace(1./n_samples, 1, n_samples) #1
-    EWG_init = np.linspace(0,8,11) #[1]
-    CN_init = [6] #np.linspace(0,6,101) #np.linspace(6./n_samples, 6, n_samples) #6
-    CN_init = np.linspace(0,1,11) #np.linspace(6./n_samples, 6, n_samples) #6
+    #EWG_init = np.linspace(1./n_samples, 1, n_samples) #1
+    #EWG_init = np.linspace(0,1,11) #[1]
+    EWG_init = np.linspace(0.01, 1., n_samples)
+    #CN_init = [6] #np.linspace(0,6,101)
+    #CN_init = np.linspace(6./n_samples, 6, n_samples) #6
+    #CN_init = np.linspace(0,1,11) #np.linspace(6./n_samples, 6, n_samples) #6
+    CN_init = np.linspace(0.001, .01, n_samples)
     
     mEN_final = np.zeros((len(EWG_init), len(CN_init)))
     pEWG_final = np.zeros((len(EWG_init), len(CN_init)))
     pCN_final = np.zeros((len(EWG_init), len(CN_init)))
     
     en_final = np.zeros((len(EWG_init), len(CN_init)))
-    
+
+    plottyplot = {}
+    plottyplot['EWG'] = []
+    plottyplot['CN'] = []
+
     for i,e in enumerate(EWG_init):
         for j,c in enumerate(CN_init):
             print('(%s, %g): %d.%d' % (nu_wg, nu_cn, i, j))
+            print (e)
+            print (c)
+            # print (str(float(e/c)))
+            # print(e / (H_EWG.value*H_wg.value))
+            # print(c / (H_CN.value*H_ci.value))
+            print (str(float((e/(H_EWG.value*H_wg.value))/(c/(H_CN.value*H_ci.value)))))
+            # this ratio (directly above) is about double the e to c ratio
+            print(e / (H_EWG.value))#*H_wg.value))
+            print(c / (H_CN.value))#*H_ci.value))
+            print (str(float((e/(H_EWG.value))/(c/(H_CN.value)))))
             # Simulate full model
-            x = sim.run(initials={model1.initial_conditions[0][0] : e, \
-                                  model1.initial_conditions[1][0] : c})
+            x = sim.run(initials={model1.initial_conditions[0][0] : e / (H_EWG.value*H_wg.value), \
+                                  model1.initial_conditions[1][0] : c / (H_CN.value*H_ci.value)})
             mEN = x.observables['mEN_obs']
+            #plt.plot(tspan,mEN,label='MA en')
+            #plt.plot(tspan, x.observables['pEWG_free'], label='EWG en')
+            #plt.plot(tspan, x.observables['pCN_free'], label='CN en')
+            #plt.legend()
+            #plt.show()
+            scaled_mEN = x.observables['mEN_obs'] * H_en.value / ktr_en.value
             pEWG = x.observables['pEWG_free']
-            scaled_pEWG = pEWG * H_wg.value * H_WG.value # H's are already divisors (see en.py)
+            scaled_pEWG = pEWG * (H_EWG.value*H_wg.value) # H's are already divisors (see en.py)
 #             scaled_pEWG = (x.observables['pEWG_free'] + x.observables['pEWG_pCN'])*H_en.value
             pCN = x.observables['pCN_free']
-            scaled_pCN = pCN * H_ci.value * H_CI.value # also already divisors
-            mEN_final[i][j] = mEN[-1]
+            scaled_pCN = pCN * (H_CN.value*H_ci.value) # also already divisors
+            #plt.plot(tspan, scaled_mEN, label='MA en scaled')
+            #plt.plot(tspan, scaled_pEWG, label='MA EWG scaled')
+            #plt.plot(tspan, scaled_pCN, label='MA CN scaled')
+            #plt.legend()
+            #plt.show()
+            #mEN_final[i][j] = scaled_mEN[-1]
+            mEN_final[i][j] = scaled_mEN[-1]
             pEWG_final[i][j] = scaled_pEWG[-1]
             pCN_final[i][j] = scaled_pCN[-1]
+            #print (str(i)+', '+str(j))
+            print (pEWG_final[i][j])
+            print (pCN_final[i][j])
+            plottyplot['EWG'].append(scaled_pEWG[-1])
+            plottyplot['CN'].append(scaled_pCN[-1])
             # Simulate reduced model
             if not np.isnan(scaled_pEWG[-1]):
-                x = sim2.run(initials={model2.initial_conditions[1][0] : scaled_pEWG[-1], 
+                x = sim2.run(initials={model2.initial_conditions[1][0] : scaled_pEWG[-1],
                                        model2.initial_conditions[2][0] : scaled_pCN[-1]})
+                # x = sim2.run(initials={model2.initial_conditions[1][0] : e,
+                #                        model2.initial_conditions[2][0] : c})
                 en_final[i][j] = x.observables['en_obs'][-1]
+                #plt.plot(tspan,scaled_mEN,label='MA en')
+                #plt.plot(tspan,x.observables['en_obs'],label='vD en')
+                #plt.plot(tspan,x.observables['EWG_nT'],label='vD EWG')
+                #plt.plot(tspan,x.observables['CN_obs'],label='vD CN')
+                #plt.legend()
+                #plt.show()
             else:
                 en_final[i][j] = float('nan')
-            plt.plot(tspan,mEN,label='MA en')
-            plt.plot(tspan,x.observables['en_obs'],label='vD en')
-            plt.legend()
-            plt.show()
+    #plt.show()
+    plt.plot(plottyplot['EWG'],label='EWG')
+    plt.plot(plottyplot['CN'],label='CN')
+    plt.legend()
+    plt.show()
 
-
+    #sys.exit(0)
     plt.figure()
     if len(CN_init) == 1:
         plt.plot(pEWG_final, mEN_final, color='0.5', lw=2)
@@ -96,8 +141,8 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
         cm.get_cmap().set_bad('k')
         plt.xlabel(r'[CN]$_0$ (scaled conc)')
         plt.ylabel(r'[EWG]$_0$ (scaled conc)')
-#         plt.xscale('log')
-#         plt.yscale('log')
+        plt.xscale('log')
+        plt.yscale('log')
         cb = plt.colorbar()
         cb.ax.set_ylabel(r'[mEN]$_\infty$ (scaled conc)', labelpad=20)
         #
@@ -106,10 +151,10 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
         cm.get_cmap().set_bad('k')
         plt.xlabel(r'[CN]$_0$ (scaled conc)')
         plt.ylabel(r'[EWG]$_0$ (scaled conc)')
-#         plt.xscale('log')
-#         plt.yscale('log')
+        plt.xscale('log')
+        plt.yscale('log')
         cb = plt.colorbar()
-        cb.ax.set_ylabel(r'[mEN]$_\infty$ (scaled conc)', labelpad=20)
+        cb.ax.set_ylabel(r'[en]$_\infty$ (scaled conc)', labelpad=20)
 plt.show()
 
 

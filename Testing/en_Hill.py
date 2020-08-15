@@ -21,10 +21,9 @@ Observable('EWG_nT', EWG())
 Observable('CN_obs', CN())
     
 Expression('Hill_CNen', (K_CNen**nu_CNen) / (K_CNen**nu_CNen + CN_obs**nu_CNen))
-#Expression('Hill_EWG_nT', H_en*(EWG_nT*Hill_CNen)**nu_WGen / (K_WGen**nu_WGen + (EWG_nT*Hill_CNen)**nu_WGen))
-Expression('Hill_EWG_nT', (EWG_nT*Hill_CNen)**nu_WGen / (K_WGen**nu_WGen + (EWG_nT*Hill_CNen)**nu_WGen))
+Expression('Hill_EWG_nT', H_en*(EWG_nT*Hill_CNen)**nu_WGen / (K_WGen**nu_WGen + (EWG_nT*Hill_CNen)**nu_WGen))
 
 Rule('synthesize_en_1', None >> en(), Hill_EWG_nT)
-Rule('degrade_en_1', en() >> None, Parameter('divided_out_deg',1))
+Rule('degrade_en_1', en() >> None, Parameter('deg',H_en.value))
 
 

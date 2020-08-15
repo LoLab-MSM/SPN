@@ -1,0 +1,1669 @@
+Index: SPN_macros.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>import inspect\nfrom pysb import *\nimport pysb.core\nfrom pysb.core import ComponentSet, as_reaction_pattern, as_complex_pattern, MonomerPattern, ComplexPattern\nimport numbers\nimport functools\nimport itertools\nimport copy\nfrom pysb.macros import bind\nfrom pysb.macros import bind_complex\nimport re\n\n# Internal helper functions (Copied from PySB)\n# =========================\n\ndef _complex_pattern_label(cp):\n    \"\"\"Return a string label for a ComplexPattern.\"\"\"\n    mp_labels = [_monomer_pattern_label(mp) for mp in cp.monomer_patterns]\n    return ''.join(mp_labels)\n\ndef _monomer_pattern_label(mp):\n    \"\"\"Return a string label for a MonomerPattern.\"\"\"\n    site_values = [str(x) for x in mp.site_conditions.values()\n                            if x is not None\n                            and not isinstance(x, list)\n                            and not isinstance(x, tuple)\n                            and not isinstance(x, numbers.Real)]\n    return mp.monomer.name + ''.join(site_values)\n\ndef _rule_name_generic(rule_expression):\n    \"\"\"Return a generic string label for a RuleExpression.\"\"\"\n    # Get ReactionPatterns\n    react_p = rule_expression.reactant_pattern\n    prod_p = rule_expression.product_pattern\n    # Build the label components\n    lhs_label = [_complex_pattern_label(cp) for cp in react_p.complex_patterns]\n    lhs_label = '_'.join(lhs_label)\n    rhs_label = [_complex_pattern_label(cp) for cp in prod_p.complex_patterns]\n    rhs_label = '_'.join(rhs_label)\n    return '%s_to_%s' % (lhs_label, rhs_label)\n\ndef _macro_rule(rule_prefix, rule_expression, klist, ksuffixes,\n                name_func=_rule_name_generic):\n    \"\"\"\n    A helper function for writing macros that generates a single rule.\n\n    Parameters\n    ----------\n    rule_prefix : string\n        The prefix that is prepended to the (automatically generated) name for\n        the rule.\n    rule_expression : RuleExpression\n        An expression specifying the form of the rule; gets passed directly\n        to the Rule constructor.\n    klist : list of Parameters or Expressions, or list of numbers\n        If the rule is unidirectional, the list must contain one element\n        (either a Parameter/Expression or number); if the rule is reversible,\n        it must contain two elements. If the rule is reversible, the first\n        element in the list is taken to be the forward rate, and the second\n        element is taken as the reverse rate. \n    ksuffixes : list of strings\n        If klist contains numbers rather than Parameters or Expressions, the\n        strings in ksuffixes are used to automatically generate the necessary\n        Parameter objects. The suffixes are appended to the rule name to\n        generate the associated parameter name. ksuffixes must contain one\n        element if the rule is unidirectional, two if it is reversible.\n    name_func : function, optional\n        A function which takes a RuleExpression and returns a string label for\n        it, to be called as part of the automatic rule name generation. If not\n        provided, a built-in default naming function will be used.\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. Contains the generated Rule and up to two\n        generated Parameter objects (if klist was given as numbers).\n\n    Notes\n    -----\n    The default naming scheme (if `name_func` is not passed) follows the form::\n\n        '%s_%s_to_%s' % (rule_prefix, lhs_label, rhs_label)\n\n    where lhs_label and rhs_label are each concatenations of the Monomer names\n    and specified sites in the ComplexPatterns on each side of the\n    RuleExpression. The actual implementation is in the function\n    _rule_name_generic, which in turn calls _complex_pattern_label and\n    _monomer_pattern_label. For some specialized reactions it may be helpful to\n    devise a custom naming scheme rather than rely on this default.\n\n    Examples\n    --------\n    Using distinct Monomers for substrate and product::\n\n        >>> from pysb import *\n        >>> from pysb.macros import _macro_rule\n        >>> \n        >>> Model() # doctest:+ELLIPSIS\n        <Model '_interactive_' (monomers: 0, rules: 0, parameters: 0, expressions: 0, compartments: 0) at ...>\n        >>> Monomer('A', ['s'])\n        Monomer('A', ['s'])\n        >>> Monomer('B', ['s'])\n        Monomer('B', ['s'])\n        >>> \n        >>> _macro_rule('bind', A(s=None) + B(s=None) <> A(s=1) % B(s=1),\n        ... [1e6, 1e-1], ['kf', 'kr']) # doctest:+NORMALIZE_WHITESPACE\n        ComponentSet([\n         Rule('bind_A_B_to_AB', A(s=None) + B(s=None) <> A(s=1) % B(s=1),\n             bind_A_B_to_AB_kf, bind_A_B_to_AB_kr),\n         Parameter('bind_A_B_to_AB_kf', 1000000.0),\n         Parameter('bind_A_B_to_AB_kr', 0.1),\n         ])\n\n    \"\"\"\n\n    r_name = '%s_%s' % (rule_prefix, name_func(rule_expression))\n\n    # If rule is unidirectional, make sure we only have one parameter\n    if (not rule_expression.is_reversible):\n        if len(klist) != 1 or len(ksuffixes) != 1:\n            raise ValueError(\"A unidirectional rule must have one parameter.\")\n    # If rule is bidirectional, make sure we have two parameters\n    else:\n        if len(klist) != 2 or len(ksuffixes) != 2:\n            raise ValueError(\"A bidirectional rule must have two parameters.\")\n\n    if all(isinstance(x, (Parameter, Expression)) for x in klist):\n        k1 = klist[0]\n        if rule_expression.is_reversible:\n            k2 = klist[1]\n        params_created = ComponentSet()\n    # if klist is numbers, generate the Parameters\n    elif all(isinstance(x, numbers.Real) for x in klist):\n        k1 = Parameter('%s_%s' % (r_name, ksuffixes[0]), klist[0])\n        params_created = ComponentSet([k1]) \n        if rule_expression.is_reversible:\n            k2 = Parameter('%s_%s' % (r_name, ksuffixes[1]),\n                           klist[1])\n            params_created.add(k2)\n    else:\n        raise ValueError(\"klist must contain Parameters, Expressions, or numbers.\")\n\n    if rule_expression.is_reversible:\n        r = Rule(r_name, rule_expression, k1, k2)\n    else:\n        r = Rule(r_name, rule_expression, k1)\n\n    # Build a set of components that were created\n    return ComponentSet([r]) | params_created\n\ndef _verify_sites(m, *site_list):\n    \"\"\"\n    Checks that the monomer m contains all of the sites in site_list.\n\n    Parameters\n    ----------\n    m : Monomer or MonomerPattern\n        The monomer to check.\n    site1, site2, ... : string\n        One or more site names to check on m\n\n    Returns\n    -------\n    True if m contains all sites; raises a ValueError otherwise.\n\n    Raises\n    ------\n    ValueError\n        If any of the sites are not found.\n\n    \"\"\"\n\n    if isinstance(m, ComplexPattern):\n        return _verify_sites_complex(m, *site_list)\n    else:\n        for site in site_list:\n            if site not in m().monomer.sites:\n                raise ValueError(\"Monomer '%s' must contain the site '%s'\" %\n                                (m().monomer.name, site))\n        return True\n\ndef _verify_sites_complex(c, *site_list):\n  \n    \"\"\"\n    Checks that the complex c contains all of the sites in site_list.\n\n    Parameters\n    ----------\n    c : ComplexPattern\n        The complex to check.\n    site1, site2, ... : string\n        One or more site names to check on c\n\n    Returns\n    -------\n    If all sites are found within the complex, a dictionary of monomers and the sites within site_list they contain.  Raises a ValueError if one or more sites not in the complex.\n\n    Raises\n    ------\n    ValueError\n         If any of the sites are not found within the complex.\n\n    \"\"\"\n\n    allsitesdict = {}\n    for mon in c.monomer_patterns:\n        allsitesdict[mon] = mon.monomer.sites\n    for site in site_list:\n        specsitesdict = {}\n        for monomer, li in allsitesdict.items():\n            for s in li:\n                if site in li:\n                    specsitesdict[monomer] = site\n        if len(specsitesdict) == 0:\n            raise ValueError(\"Site '%s' not found in complex '%s'\" % (site, c))\n    return specsitesdict\n\ndef bind_name_func(rule_expression):\n    react_cps = rule_expression.reactant_pattern.complex_patterns\n    return '_'.join(_complex_pattern_label(cp) for cp in react_cps)\n\n# Boolean to Rules\n# ================\n\ndef macro_monomer(monomer_prefix, site_list, m_0, init_states, site_states=None): # possible helper function\n    \"\"\"\n    A helper function for writing macros that generates a single monomer.\n \n    Parameters\n    ----------\n    monomer_prefix : string\n        The prefix that is prepended to the (automatically generated) name for\n        the monomer.\n    site_list : list of monomer sites\n    m_0 : numerical value\n        Initial value of the monomer\n    init_states: list of initial site states\n    site_states: dict of possible site states\n \n    Returns\n    -------\n    components : ComponentSet\n        The generated components. Contains the generated Monomer, Initial condition parameter\n        and observables for each possible state (if bound/unbound)\n \n \n    \"\"\"\n    \n    m_name = '%s' % (monomer_prefix)\n    m = Monomer(m_name, site_list, site_states)\n    dict = {}\n    for i in range(len(site_list)):\n        dict[site_list[i]] = None\n    p = Parameter('%s_%s' % (m_name, '0'), m_0)\n\n    components = [m,p]\n\n    initial = {}\n    for j in range(len(site_list)):\n        initial[site_list[j]] = None\n    i_Pattern = MonomerPattern(monomer=m, site_conditions=initial, compartment=None)\n    Initial(i_Pattern, p)\n    \n    if site_states == None:\n        for each in itertools.product('10', repeat = len(init_states)):\n            combo = ''.join(each)\n            statelist = [j for j in range(len(each))]\n            for j in range(len(each)):\n                if each[j] == '0':\n                    statelist[j] = None\n            obs = {}\n            for j in range(len(site_list)):\n                obs[site_list[j]] = statelist[j]\n            o_Pattern = MonomerPattern(monomer=m, site_conditions=obs, compartment=None)\n            components.append(Observable('%s_%s_%s' % (m_name, combo, 'obs'), o_Pattern))\n    return m\n\ndef transcription_cooperative(gene, g_sites, TFs, TF_sites, activity, klist, product, ts_r, deg_r):\n    \n    components = ComponentSet()\n    \n    site_dict_0 = {}\n    site_dict_1 = {}\n    for i in range(len(TFs)):\n        site_dict_1[g_sites[i]] = None\n    for i in range(len(TFs)):\n        if isinstance(TFs[i], list):\n            for j in range(len(TFs[i])):\n                site_dict_0 = copy.deepcopy(site_dict_1)\n                site_dict_1[g_sites[i]] = i\n                site_dict_0[g_sites[i]] = None\n                components |= _macro_rule('bind'+str(i),\n                        gene(site_dict_0) + TFs[i][j]({TF_sites[i]: None}) <>\n                        gene(site_dict_1) % TFs[i][j]({TF_sites[i]: i}),\n                        klist[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n        else:\n            site_dict_0 = copy.deepcopy(site_dict_1)\n            site_dict_1[g_sites[i]] = i\n            site_dict_0[g_sites[i]] = None\n            components |= _macro_rule('bind'+str(i),\n                    gene(site_dict_0) + TFs[i]({TF_sites[i]: None}) <>\n                    gene(site_dict_1) % TFs[i]({TF_sites[i]: i}),\n                    klist[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)                     \n            \n    site_dict_t = copy.deepcopy(site_dict_1)       \n    for i,each in enumerate(g_sites):\n        if activity[i] == 0:\n            site_dict_t[g_sites[i]] = None\n             \n    components |= _macro_rule('transcription',\n                        gene(site_dict_t) >>\n                        gene(site_dict_t) + product(),\n                        [ts_r], ['kts'], name_func=bind_name_func)\n            \n    components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)\n    \n    return components\n\ndef transcription_cooperative_n(gene, TFs, TF_c, TF_sites, activity, klist, product, ts_r, deg_r):\n    \"\"\"\n    This macro is unfinished\n    \"\"\"\n    \n    # setup for gene creation\n    TTFs = []\n    TTF_sites = []\n    g_sites = []\n    site_activity = []\n    for i,each in enumerate(TFs):\n        for j in range(len(TF_c)):\n            new_site_name = ''\n            TTFs.append(TFs[i])\n            site_activity.append(activity[i])\n            TTF_sites.append(TF_sites[i])\n            if isinstance(TTFs[-1], Monomer):\n                index = TTFs[-1].name.rfind(\"_\")\n                new_site_name = TTFs[-1].name[:index] + str(j)\n            else:\n                nsn = str(each)\n                nsn = re.sub(r'\\([^)]*\\)', '', nsn)\n                nsn = nsn.replace(\" \", \"\")\n                new_site_name = nsn + '_' + str(j)\n            g_sites.append(new_site_name)\n    init_states = [None for x in range(len(g_sites))]\n    k_list = klist\n    \n    # create gene\n    gene = macro_monomer(gene, g_sites, 1, init_states)\n    components = ComponentSet()\n\n    site_dict_0 = {}\n    site_dict_1 = {}\n    for i in range(len(TTFs)):\n        site_dict_1[g_sites[i]] = None\n    for i in range(len(TTFs)):\n        if isinstance(TTFs[i], list):\n            for j in range(len(TTFs[i])):\n                if isinstance(TTFs[i][j], Monomer):\n                    site_dict_0 = copy.deepcopy(site_dict_1)\n                    site_dict_1[g_sites[i]] = i\n                    site_dict_0[g_sites[i]] = None\n                    components |= _macro_rule('bind'+str(i),\n                            gene(site_dict_0) + TTFs[i][j]({TTF_sites[i]: None}) <>\n                            gene(site_dict_1) % TTFs[i][j]({TTF_sites[i]: i}),\n                            k_list[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                else:\n                    site_dict_0 = copy.deepcopy(site_dict_1)\n                    site_dict_1[g_sites[i]] = i+50\n                    site_dict_0[g_sites[i]] = None\n                    components |= _macro_rule('bind'+str(i),\n                            gene(site_dict_0) + TTFs[i][j]({TTF_sites[i]: None}) <>\n                            gene(site_dict_1) % TTFs[i][j]({TTF_sites[i]: i+50}),\n                            k_list[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n        else:\n            if isinstance(TTFs[i], Monomer):\n                site_dict_0 = copy.deepcopy(site_dict_1)\n                site_dict_1[g_sites[i]] = i\n                site_dict_0[g_sites[i]] = None\n                components |= _macro_rule('bind'+str(i),\n                        gene(site_dict_0) + TTFs[i]({TTF_sites[i]: None}) <>\n                        gene(site_dict_1) % TTFs[i]({TTF_sites[i]: i}),\n                        k_list[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n            else:\n                site_dict_0 = copy.deepcopy(site_dict_1)\n                site_dict_1[g_sites[i]] = i+50\n                site_dict_0[g_sites[i]] = None\n                components |= _macro_rule('bind'+str(i),\n                        gene(site_dict_0) + TTFs[i]({TTF_sites[i]: None}) <>\n                        gene(site_dict_1) % TTFs[i]({TTF_sites[i]: i+50}),\n                        k_list[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n            \n    site_dict_t = copy.deepcopy(site_dict_1)       \n    for i,each in enumerate(g_sites):\n        if site_activity[i] == 0:\n            site_dict_t[g_sites[i]] = None\n    \n    components |= _macro_rule('transcription',\n                        gene(site_dict_t) >>\n                        gene(site_dict_t) + product(),\n                        [ts_r], ['kts'], name_func=bind_name_func)\n             \n    components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)\n     \n    return components\n\ndef transcription_switch(gene, g_sites, TF_list, TF_sites, klist, product, tlist, deg_r, switch_state):\n\n    \"\"\"\n    Generates a set of reactions describing transcriptional regulation. These reactions \n    account for both the mass action aspects of trascription factor binding and the \n    combinatorial/switch-like apects of transcription\n    \n    Parameters\n    ----------\n    gene : Monomer\n    TF_list: list of Monomers\n        List of transcription factors, both activators and inhibitors that may bind the gene\n    g_sites, TF_sites : string\n        The names of the binding sites on the gene and TFs respectively.\n    klist : list of 2*|TF_list| Parameters\n        The forward and reverse rate constants for each TF.\n    tlist : list of 2 Parameters\n        list of 2 rate constants, an active rate and a leakage rate\n    product : Monomer\n    switch_state : string - binary\n        A Boolean state describing the 'active' configuration of bound transcription\n        factors\n    \n    Returns\n    -------\n    components : ComponentSet\n        The generated components.\n    \"\"\"\n       \n    components = ComponentSet()\n    \n    k=0\n    for i in range(len(TF_list)):\n        if isinstance(TF_list[i], list):\n            for j in range(len(TF_list[i])):\n                if isinstance(TF_list[i][j], Monomer):\n                    components |= _macro_rule('bind',\n                                        gene({g_sites[i]: None}) + TF_list[i][j]({TF_sites[i]: None}) <>\n                                        gene({g_sites[i]: i}) % TF_list[i][j]({TF_sites[i]: i}),\n                                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                    k+=1\n                else:\n                    components |= _macro_rule('bind',\n                                        gene({g_sites[i]: None}) + TF_list[i][j]({TF_sites[i]: None}) <>\n                                        gene({g_sites[i]: i+50}) % TF_list[i][j]({TF_sites[i]: i+50}),\n                                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                    k+=1\n        else:\n            if isinstance(TF_list[i], Monomer):\n                components |= _macro_rule('bind',\n                        gene({g_sites[i]: None}) + TF_list[i]({TF_sites[i]: None}) <>\n                        gene({g_sites[i]: i}) % TF_list[i]({TF_sites[i]: i}),\n                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                k+=1\n            else:\n                components |= _macro_rule('bind',\n                                    gene({g_sites[i]: None}) + TF_list[i]({TF_sites[i]: None}) <>\n                                    gene({g_sites[i]: i+50}) % TF_list[i]({TF_sites[i]: i+50}),\n                                    klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                k+=1\n\n    for each in itertools.product('10', repeat = len(g_sites)):\n        combo = ''.join(each)\n        statelist = []\n        for j in range(len(each)):\n            if each[j] == '1':\n                statelist.append(j)\n            else:\n                statelist.append(None)\n\n        site_states = {}\n        for j in range(len(g_sites)):\n            site_states[g_sites[j]] = statelist[j]\n\n        if combo == switch_state:\n            components |= _macro_rule('transcription'+str(combo),\n                                gene(site_states) >>\n                                gene(site_states) + product(),\n                                [tlist[0]], ['kt'], name_func=bind_name_func)\n        else:\n            components |= _macro_rule('transcription'+str(combo),\n                                gene(site_states) >>\n                                gene(site_states) + product(),\n                                [tlist[1]], ['kl'], name_func=bind_name_func)\n                \n    components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)\n   \n    return components\n\ndef transcription(gene, g_sites, TF_list, TF_sites, klist, product, tlist, deg_r):\n    \"\"\"\n    Generates a set of reactions describing the transcriptional regulation. These reactions \n    account for both the mass action aspects of trascription factor binding and the \n    combinatorial/switch-like apects of transcription\n    \n    Parameters\n    ----------\n    gene : Monomer\n    TF_list: list of Monomers\n        List of transcription factors, both activators and inhibitors that may bind the gene\n    g_sites, TF_sites : string\n        The names of the binding sites on the gene and TFs respectively.\n    klist : list of 2*|TF_list| Parameters\n        The forward and reverse rate constants for each TF.\n    tlist : list of 2^|TF_list| Parameters\n        list of rate constants, one for each combination of TFs\n    product : Monomer\n    \n    Returns\n    -------\n    components : ComponentSet\n        The generated components.\n    \"\"\"\n    \n    components = ComponentSet()\n    k=0\n    for i in range(len(TF_list)):\n        if isinstance(TF_list[i], list):\n            for j in range(len(TF_list[i])):\n                if isinstance(TF_list[i][j], Monomer):\n                    components |= _macro_rule('bind',\n                                        gene({g_sites[i]: None}) + TF_list[i][j]({TF_sites[i]: None}) <>\n                                        gene({g_sites[i]: i}) % TF_list[i][j]({TF_sites[i]: i}),\n                                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                    k+=1\n                else:\n                    components |= _macro_rule('bind',\n                                        gene({g_sites[i]: None}) + TF_list[i][j]({TF_sites[i]: None}) <>\n                                        gene({g_sites[i]: i+50}) % TF_list[i][j]({TF_sites[i]: i+50}),\n                                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                    k+=1\n        else:\n            if isinstance(TF_list[i], Monomer):\n                components |= _macro_rule('bind',\n                        gene({g_sites[i]: None}) + TF_list[i]({TF_sites[i]: None}) <>\n                        gene({g_sites[i]: i}) % TF_list[i]({TF_sites[i]: i}),\n                        klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                k+=1\n            else:\n                components |= _macro_rule('bind',\n                                    gene({g_sites[i]: None}) + TF_list[i]({TF_sites[i]: None}) <>\n                                    gene({g_sites[i]: i+50}) % TF_list[i]({TF_sites[i]: i+50}),\n                                    klist[k*2:k*2+2], ['kf', 'kr'], name_func=bind_name_func)\n                k+=1            \n                \n    for i,each in enumerate(itertools.product('01', repeat = len(g_sites))):\n        combo = ''.join(each)\n        statelist = []\n        for j in range(len(each)):\n            if each[j] == '1':\n                statelist.append(j)\n            else:\n                statelist.append(None)\n                \n        site_states = {}\n        for j in range(len(g_sites)):\n            site_states[g_sites[j]] = statelist[j]\n              \n        components |= _macro_rule('transcription'+str(combo),\n                            gene(site_states) >>\n                            gene(site_states) + product(),\n                            [tlist[i]], [combo], name_func=bind_name_func)\n\n    components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)\n    \n    return components\n\ndef translation(mRNA, protein, klist):\n    \"\"\"\n    Generates a set of reactions describing the translation of mRNA to protein.\n    \n    Parameters\n    ----------\n    mRNA : Monomer\n    k_list : list of 2 Parameters\n        List of two rate constants for translation and degradation of protein.\n    product : Monomer\n    Returns\n    -------\n    components : ComponentSet\n        The generated components.\n    \"\"\"\n\n    site_states = {}\n    for j in range(len(protein.sites)):\n        site_states[protein.sites[j]] = None\n\n    components = _macro_rule('translation',\n                        mRNA() >> mRNA() + protein(site_states), \n                        [klist[0]], ['kt'])\n     \n    components |= _macro_rule('degradation', \n                              protein(site_states) >> None, [klist[1]], ['kd'])\n  \n    return components\n\ndef translation_persistant(mRNA, protein, klist):\n    \"\"\"\n    Generates a reaction describing the translation of mRNA to protein.\n    NO degradation reaction is provided\n    \n    Parameters\n    ----------\n    mRNA : Monomer\n    k_list : list of 2 Parameters\n        List of two rate constants for translation and degradation of protein.\n    product : Monomer\n    Returns\n    -------\n    components : ComponentSet\n        The generated components.\n    \"\"\"\n\n    site_states = {}\n    for j in range(len(protein.sites)):\n        site_states[protein.sites[j]] = None\n\n    components = _macro_rule('translation',\n                        mRNA() >> mRNA() + protein(site_states), \n                        [klist[0]], ['kt'], name_func=bind_name_func)\n  \n    return components\n\ndef binary_transformation(enzyme, e_site, substrate, s_site, product_1, product_2, k_list):\n    \"\"\"\n    Generates a set of reactions describing a catalytic reaction that results in the consumption \n    of substrate and subsequent production of one of two products depending on the presence of enzyme. \n    (could be expanded to accept additional products and/or enzymes). Additional sites are assumed \n    to be unbound.\n    \n    Parameters\n    ----------\n    enzyme, substrate : Monomers\n    substrate : Monomer\n    e_site : List of strings\n        binding and activation sites on the enzyme\n    s_site : String\n        binding site on the substrate\n    product_1, product_2 : Monomers\n    \n    k_list : list of 6 Parameters\n        parameters represent, in the following order,\n        - the forward and reverse binding rates for enzyme and substrate\n        - the catalytic rate constant for product_1 (with enzyme present)\n        - the catalytic rate constant for product_2 (without enzyme present)\n        - the degradation rates for product_1 and product_2\n        \n    Returns\n    -------\n    components : ComponentSet\n        The generated components.\n    \"\"\"\n    \n    enzyme_sites_pre = {}\n    for each in enzyme.sites:\n        enzyme_sites_pre[each] = None\n\n    enzyme_sites_bound = {}\n    for each in enzyme.sites:\n        if each == e_site:\n            enzyme_sites_bound[each] = 1\n        else:\n            enzyme_sites_bound[each] = None\n            \n    components = ComponentSet()\n            \n    components |= _macro_rule('bind',\n            enzyme(enzyme_sites_pre) + substrate({s_site: None}) <>\n            enzyme(enzyme_sites_bound) % substrate({s_site: 1}),\n            [k_list[0],k_list[1]], ['kf', 'kr'], name_func=bind_name_func)  \n\n    pro_sites_1 = {}\n    for each in product_1.sites:\n        pro_sites_1[each] = None  \n\n    components |= _macro_rule('catalyze_1',\n            enzyme(enzyme_sites_bound) % substrate({s_site: 1}) >>\n            enzyme(enzyme_sites_pre) + product_1(pro_sites_1),\n            [k_list[2]], ['kc1'], name_func=bind_name_func)\n\n    pro_sites_2 = {}\n    for each in product_2.sites:\n        pro_sites_2[each] = None \n\n    components |= _macro_rule('catalyze_2',\n            substrate({s_site: None}) >> product_2(pro_sites_2),\n            [k_list[3]], ['kc2'], name_func=bind_name_func)\n    \n    components |= _macro_rule('degradation_1', product_1() >> None, [k_list[4]], ['kd1'], name_func=bind_name_func)\n    components |= _macro_rule('degradation_2', product_2() >> None, [k_list[5]], ['kd2'], name_func=bind_name_func)\n    \n    return components\n    \ndef dimerization(s1, site_1, s2, site_2, product, k_list):\n    \"\"\"\n    This is essentially identical to a binding reaction. The differences are the\n    possibility of multiple binding partners and the relabeling as a new species \n    to be consistent with the logical model.\n    \n    Currently assumes Monomers are completely unbound\n    \n    Parameters\n    ----------\n    s1 : Monomer\n    s2 : List of identicle Monomers\n        Monomers participating in the binding reaction.\n    site_1, site_2 : string, list of strings\n        The names of the sites on s1 and s2 used for binding.\n    product : \n    k_list : list of 3 Parameters\n        Forward and reverse rate constants (in that order) and \n        a degradation rate for the product.\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"\n    \n    components = ComponentSet()\n    \n    pro_sites = {}\n    for each in product.sites:\n        pro_sites[each] = None\n    \n    s1_sites = {}\n    for each in s1.sites:\n        if each == site_1:\n            s1_sites[each] = None\n        else:\n            s1_sites[each] = None\n    \n    if type(s2) is list:\n        s2_sites = {}\n        for each in s2[0].sites:\n            if each == site_2:\n                s2_sites[each] = None\n            else:\n                s2_sites[each] = None\n                \n        for each in s2:\n            components |= _macro_rule('dimerize',\n                               s1(s1_sites) + each(s2_sites) <> product(pro_sites),\n                               k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)\n    else:\n        s2_sites = {}      \n        for each in s2.sites:\n            if each == site_2:\n                s2_sites[each] = None\n            else:\n                s2_sites[each] = None \n        \n\n        components |= _macro_rule('dimerize',\n                           s1(s1_sites) + s2(s2_sites) <> product(pro_sites),\n                           k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)\n    \n    components |= _macro_rule('degradation', product() >> None, [k_list[2]], ['kd'], name_func=bind_name_func)\n\ndef proteolysis(enzyme, e_site, target, t_site, k_list):\n    \"\"\"\n    This represents degradation of one species by another.\n    \n    Parameters\n    ----------\n    enzyme, target : Monomers\n    e_site, t_site : strings\n        The names of the sites on s1 and s2 used for binding.\n    product : \n    k_list : list of 3 Parameters\n        Forward and reverse rate constants (in that order) and \n        a degradation rate.\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"\n    \n    components = ComponentSet()\n    \n    components |= _macro_rule('bind',\n                       enzyme({e_site:None}) + target({t_site:None}) <> enzyme({e_site:1}) % target({t_site:1}),\n                       k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)\n    \n    components |= _macro_rule('proteolysis', enzyme({e_site:1}) % target({t_site:1}) >> enzyme({e_site:None}), [k_list[2]], ['kd'], name_func=bind_name_func)\n    \ndef perimeter_diffusion(side_list, diffusion_rate):\n    \"\"\"\n    This represents diffusion around the perimeter of the cell.\n    \n    Parameters\n    ----------\n    side_list : list of cell faces in order\n    diffusion_rate : rate of diffusion between sides\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"\n    sites = {}\n    for each in side_list[0].sites:\n        sites[each] = None    \n    \n    components = ComponentSet()\n    \n    for i in range(len(side_list)):        \n        components |= _macro_rule('diffuse', side_list[i](sites) <> side_list[(i+1)%len(side_list)](sites), [diffusion_rate, diffusion_rate], ['diff_r', 'diff_r'])\n    \n    return components\n    \ndef face_to_face_diffusion(side_pairs, diffusion_rate):\n    \"\"\"\n    This represents diffusion between faces of opposing cells.\n    \n    Parameters\n    ----------\n    side_pairs : list of opposing pairs of faces; [[face1, face2],[face3, face4], ...]\n    diffusion_rate : rate of diffusion between faces\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"\n    sites = {}\n    for each in side_pairs[0][0].sites:\n        sites[each] = None\n    \n    components = ComponentSet()\n\n    for i in range(len(side_pairs)):        \n        components |= _macro_rule('diffuse', side_pairs[i][0](sites) <> side_pairs[i][1](sites), [diffusion_rate, diffusion_rate], ['diff_r', 'diff_r'])\n     \n    return components\n    \ndef exo_endo(internal, external, diffusion_rates):\n    \"\"\"\n    This represents endo- and exocytosis of a species. Either\n    reaction converts one species into another.\n    \n    Parameters\n    ----------\n    internal : cytoplasmic species\n    external : cell surface species\n    diffusion_rates: list\n        An exocytosis and an endocytosis rate\n    Returns\n    -------\n    components : ComponentSet\n        The generated components.     \n    \"\"\"\n    sites_in = {}\n    for each in internal.sites:\n        sites_in[each] = None\n    \n    sites_ex = {}\n    for each in external[0].sites:\n        sites_ex[each] = None\n    \n    components = ComponentSet()\n    \n    if isinstance(external, list):\n        for i in range(len(external)):        \n            components |= _macro_rule('diffuse', internal(sites_in) <> external[i](sites_ex), diffusion_rates[i*2:i*2+2], ['exo', 'endo'])\n    else:\n        components |= _macro_rule('diffuse', internal(sites_in) <> external(sites_ex), diffusion_rates, ['exo', 'endo'])\n    \n    return components\n    \ndef bind_multiple(s1, site_1, s2_list, site_2_list, k_list):\n    \"\"\"\n    This macro produces separate binding reactions between one species\n        and a list of species.\n    \n    Parameters\n    ----------\n    s1 : Monomer\n    site_1 : binding site for Monomer s1\n    s2_list : List of different Monomers\n        Monomers participating in the binding reaction.\n    site_2_list : list\n        List of binding sites for s2_list\n    product : \n    k_list : list of binding rates\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"\n    components = ComponentSet()\n    \n    for i,each in enumerate(s2_list):\n        components |= _macro_rule('bind',\n                   s1(**{site_1: None}) + s2_list[i](**{site_2_list[i]: None}) <>\n                   s1(**{site_1: 1}) % s2_list[i](**{site_2_list[i]: 1}),\n                   k_list[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)\n\n    \ndef degradation(p_list, deg_rate):\n    \"\"\"\n    This represents simple degradation of a list of species with the same degradation rate.\n    \n    Parameters\n    ----------\n    p_list : list of species to degrade\n    degradation_rate : rate of degradation\n\n    Returns\n    -------\n    components : ComponentSet\n        The generated components. \n    \"\"\"    \n    components = ComponentSet()\n    \n    if isinstance(p_list, list):\n        for i, each in enumerate(p_list):\n            components |= _macro_rule('degradation', p_list[i]() >> None, [deg_rate], ['kd'], name_func=bind_name_func)\n    \n    else:\n        components |= _macro_rule('degradation', p_list() >> None, [deg_rate], ['kd'], name_func=bind_name_func)\n    \n    \n    \n    \n    \n\n\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- SPN_macros.py	(revision 041b5860cd45bbfa42209f70bc6a849c1c93472f)
++++ SPN_macros.py	(date 1588038985798)
+@@ -276,7 +276,10 @@
+     return m
+ 
+ def transcription_cooperative(gene, g_sites, TFs, TF_sites, activity, klist, product, ts_r, deg_r):
+-    
++    # right now this method isn't built for multiple g_sites
++    # is totally fine for multiple TFs though
++    # I am going to use it as if g_sites is a single binding site name rather than a list
++
+     components = ComponentSet()
+     
+     site_dict_0 = {}
+@@ -303,17 +306,35 @@
+                     klist[i*2:i*2+2], ['kf', 'kr'], name_func=bind_name_func)                     
+             
+     site_dict_t = copy.deepcopy(site_dict_1)       
+-    for i,each in enumerate(g_sites):
+-        if activity[i] == 0:
+-            site_dict_t[g_sites[i]] = None
+-             
+-    components |= _macro_rule('transcription',
+-                        gene(site_dict_t) >>
+-                        gene(site_dict_t) + product(),
+-                        [ts_r], ['kts'], name_func=bind_name_func)
+-            
+-    components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)
+-    
++    # Doesnt currently work -- buggy leaves a 'hanging bond' error
++    # So removing this for now and treating g_sites as single site
++    #for i,each in enumerate(g_sites):
++    #    if activity[i] == 0:
++    #        site_dict_t[g_sites[i]] = None
++    #
++    #components |= _macro_rule('transcription',
++    #                    gene(site_dict_t) >>
++    #                    gene(site_dict_t) + product(),
++    #                    [ts_r], ['kts'], name_func=bind_name_func)
++    #
++
++    # SBeik edit to make this method work with single g_sites
++    for c in components:
++        binding_output = None
++        for i, each in enumerate(g_sites):
++            if activity[i] == 0:
++                site_dict_t[g_sites[i]] = None
++                binding_output = gene(site_dict_t)
++            else:
++                binding_output = c.rule_expression.product_pattern
++        components |= _macro_rule('transcription',
++                                  binding_output >>
++                                  binding_output + product(),
++                                  [ts_r], ['kts'], name_func=bind_name_func)
++
++    if not deg_r == None:
++        components |= _macro_rule('degradation', product() >> None, [deg_r], ['kd'], name_func=bind_name_func)
++
+     return components
+ 
+ def transcription_cooperative_n(gene, TFs, TF_c, TF_sites, activity, klist, product, ts_r, deg_r):
+@@ -735,32 +756,60 @@
+         else:
+             s1_sites[each] = None
+     
+-    if type(s2) is list:
+-        s2_sites = {}
+-        for each in s2[0].sites:
+-            if each == site_2:
+-                s2_sites[each] = None
+-            else:
+-                s2_sites[each] = None
+-                
+-        for each in s2:
+-            components |= _macro_rule('dimerize',
+-                               s1(s1_sites) + each(s2_sites) <> product(pro_sites),
+-                               k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)
+-    else:
+-        s2_sites = {}      
+-        for each in s2.sites:
+-            if each == site_2:
+-                s2_sites[each] = None
+-            else:
+-                s2_sites[each] = None 
+-        
++    if len(k_list)==3:
++        if type(s2) is list:
++            s2_sites = {}
++            for each in s2[0].sites:
++                if each == site_2:
++                    s2_sites[each] = None
++                else:
++                    s2_sites[each] = None
++
++            for each in s2:
++                components |= _macro_rule('dimerize',
++                                   s1(s1_sites) + each(s2_sites) <> product(pro_sites),
++                                   k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)
++        else:
++            s2_sites = {}
++            for each in s2.sites:
++                if each == site_2:
++                    s2_sites[each] = None
++                else:
++                    s2_sites[each] = None
++
+ 
+-        components |= _macro_rule('dimerize',
+-                           s1(s1_sites) + s2(s2_sites) <> product(pro_sites),
+-                           k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)
+-    
+-    components |= _macro_rule('degradation', product() >> None, [k_list[2]], ['kd'], name_func=bind_name_func)
++            components |= _macro_rule('dimerize',
++                               s1(s1_sites) + s2(s2_sites) <> product(pro_sites),
++                               k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)
++
++        components |= _macro_rule('degradation', product() >> None, [k_list[2]], ['kd'], name_func=bind_name_func)
++    elif len(k_list) == 2:
++        if type(s2) is list:
++            s2_sites = {}
++            for each in s2[0].sites:
++                if each == site_2:
++                    s2_sites[each] = None
++                else:
++                    s2_sites[each] = None
++
++            for each in s2:
++                components |= _macro_rule('dimerize',
++                                          s1(s1_sites) + each(s2_sites) <> product(pro_sites),
++                                          k_list[0:2], ['kf', 'kr'], name_func=bind_name_func)
++        else:
++            s2_sites = {}
++            for each in s2.sites:
++                if each == site_2:
++                    s2_sites[each] = None
++                else:
++                    s2_sites[each] = None
++
++            components |= _macro_rule('dimerize',
++                                      s1(s1_sites) + s2(s2_sites) >> product(pro_sites),
++                                      [k_list[0]], ['kf'], name_func=bind_name_func)
++
++        components |= _macro_rule('degradation', product() >> None, [k_list[1]], ['kd'], name_func=bind_name_func)
++
+ 
+ def proteolysis(enzyme, e_site, target, t_site, k_list):
+     """
+Index: B2R_synch.py
+===================================================================
+--- B2R_synch.py	(revision 041b5860cd45bbfa42209f70bc6a849c1c93472f)
++++ B2R_synch.py	(revision 041b5860cd45bbfa42209f70bc6a849c1c93472f)
+@@ -1,44 +0,0 @@
+-
+-import numpy as np
+-from pysb.integrate import Solver
+-from copy import deepcopy
+-from pysb import ComponentSet
+-
+-from test import model as model0
+-
+-models = []
+-for each in model0.rules:
+-    models.append(deepcopy(model0))
+-    models[-1].rules = ComponentSet([each])
+-
+-params = []
+-for each in model0.parameters:
+-    params.append(each.value)
+-tail = params[-len(model0.monomers):]
+-t = np.linspace(0, 10, 11)
+-steps = 10
+-trace = [deepcopy(params[:-len(model0.monomers)])]
+-
+-for _ in range(steps):
+-
+-    new_params = deepcopy(params[:-len(model0.monomers)])
+-    for each in models:
+-        s = Solver(each, t)
+-        s.run(params)
+-        m = list(s.y[-1])
+-        for i, each in enumerate(m):
+-            if each < 0.5:
+-                m[i] = 0.0
+-            else:
+-                m[i] = 1.0
+-        for i,each in enumerate(m):
+-            if each != params[i]:
+-                new_params[i] = each
+-
+-    params = new_params + tail
+-    trace.append(deepcopy(new_params))
+-
+-print ' A_F, A_T, B_F, B_T, C_F, C_T'
+-for i,each in enumerate(trace):
+-    print i, each
+-    
+Index: .idea/inspectionProfiles/profiles_settings.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/inspectionProfiles/profiles_settings.xml	(date 1588008484820)
++++ .idea/inspectionProfiles/profiles_settings.xml	(date 1588008484820)
+@@ -0,0 +1,7 @@
++<component name="InspectionProjectProfileManager">
++  <settings>
++    <option name="PROJECT_PROFILE" value="Default" />
++    <option name="USE_PROJECT_PROFILE" value="false" />
++    <version value="1.0" />
++  </settings>
++</component>
+\ No newline at end of file
+Index: Model_SPN_massaction.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- Model_SPN_massaction.py	(date 1581521070048)
++++ Model_SPN_massaction.py	(date 1581521070048)
+@@ -0,0 +1,1310 @@
++from pysb import *
++from sympy import sympify
++
++Model()
++
++# This model of the segment polarity network consists of 4 cells and 6 faces per cell
++
++# Monomers
++Monomer('en_1')  # engrailed mRNA cell 1
++Monomer('en_2')  # "            " cell 2
++Monomer('en_3')
++Monomer('en_4')
++Monomer('EN_1')  # engrailed protein
++Monomer('EN_2')
++Monomer('EN_3')
++Monomer('EN_4')
++Monomer('wg_1')  # wingless mRNA
++Monomer('wg_2')
++Monomer('wg_3')
++Monomer('wg_4')
++Monomer('IWG_1')  # intracellular wingless protein
++Monomer('IWG_2')
++Monomer('IWG_3')
++Monomer('IWG_4')
++Monomer('EWG_1_1')  # extracellular wingless protein cell 1 face 1
++Monomer('EWG_1_2')  # "                                   " face 2
++Monomer('EWG_1_3')
++Monomer('EWG_1_4')
++Monomer('EWG_1_5')
++Monomer('EWG_1_6')
++Monomer('EWG_2_1')
++Monomer('EWG_2_2')
++Monomer('EWG_2_3')
++Monomer('EWG_2_4')
++Monomer('EWG_2_5')
++Monomer('EWG_2_6')
++Monomer('EWG_3_1')
++Monomer('EWG_3_2')
++Monomer('EWG_3_3')
++Monomer('EWG_3_4')
++Monomer('EWG_3_5')
++Monomer('EWG_3_6')
++Monomer('EWG_4_1')
++Monomer('EWG_4_2')
++Monomer('EWG_4_3')
++Monomer('EWG_4_4')
++Monomer('EWG_4_5')
++Monomer('EWG_4_6')
++Monomer('ptc_1')  # patched mRNA
++Monomer('ptc_2')
++Monomer('ptc_3')
++Monomer('ptc_4')
++Monomer('PTC_1_1')  # patched protein
++Monomer('PTC_1_2')
++Monomer('PTC_1_3')
++Monomer('PTC_1_4')
++Monomer('PTC_1_5')
++Monomer('PTC_1_6')
++Monomer('PTC_2_1')
++Monomer('PTC_2_2')
++Monomer('PTC_2_3')
++Monomer('PTC_2_4')
++Monomer('PTC_2_5')
++Monomer('PTC_2_6')
++Monomer('PTC_3_1')
++Monomer('PTC_3_2')
++Monomer('PTC_3_3')
++Monomer('PTC_3_4')
++Monomer('PTC_3_5')
++Monomer('PTC_3_6')
++Monomer('PTC_4_1')
++Monomer('PTC_4_2')
++Monomer('PTC_4_3')
++Monomer('PTC_4_4')
++Monomer('PTC_4_5')
++Monomer('PTC_4_6')
++Monomer('ci_1')  # cubitus interuptus mRNA
++Monomer('ci_2')
++Monomer('ci_3')
++Monomer('ci_4')
++Monomer('CI_1')  # full length cubitus interuptus protein
++Monomer('CI_2')
++Monomer('CI_3')
++Monomer('CI_4')
++Monomer('CN_1')  # cleaved cubitus interuptus protein
++Monomer('CN_2')
++Monomer('CN_3')
++Monomer('CN_4')
++Monomer('hh_1')  # hedgehog mRNA
++Monomer('hh_2')
++Monomer('hh_3')
++Monomer('hh_4')
++Monomer('HH_1_1')  # hedgehog protein
++Monomer('HH_1_2')
++Monomer('HH_1_3')
++Monomer('HH_1_4')
++Monomer('HH_1_5')
++Monomer('HH_1_6')
++Monomer('HH_2_1')
++Monomer('HH_2_2')
++Monomer('HH_2_3')
++Monomer('HH_2_4')
++Monomer('HH_2_5')
++Monomer('HH_2_6')
++Monomer('HH_3_1')
++Monomer('HH_3_2')
++Monomer('HH_3_3')
++Monomer('HH_3_4')
++Monomer('HH_3_5')
++Monomer('HH_3_6')
++Monomer('HH_4_1')
++Monomer('HH_4_2')
++Monomer('HH_4_3')
++Monomer('HH_4_4')
++Monomer('HH_4_5')
++Monomer('HH_4_6')
++Monomer('PH_1_1')  # patched-hedgehog protein complex
++Monomer('PH_1_2')
++Monomer('PH_1_3')
++Monomer('PH_1_4')
++Monomer('PH_1_5')
++Monomer('PH_1_6')
++Monomer('PH_2_1')
++Monomer('PH_2_2')
++Monomer('PH_2_3')
++Monomer('PH_2_4')
++Monomer('PH_2_5')
++Monomer('PH_2_6')
++Monomer('PH_3_1')
++Monomer('PH_3_2')
++Monomer('PH_3_3')
++Monomer('PH_3_4')
++Monomer('PH_3_5')
++Monomer('PH_3_6')
++Monomer('PH_4_1')
++Monomer('PH_4_2')
++Monomer('PH_4_3')
++Monomer('PH_4_4')
++Monomer('PH_4_5')
++Monomer('PH_4_6')
++
++# Parameters
++
++# see Dassow (2000) supplementary information and the Ingeneue website
++# K_XXyy = XX concentration at which yy is half maximally activated
++# nu_XXyy cooperativity coefficient
++# H_XX = half-life of XX
++# Endo_XX = rate at which XX is endocytosed
++# Exo_XX = rate at which XX is exocytosed
++# Mxfer_XX rate at which XX diffuses from one cell to another
++# LMxfer_XX rate at which XX diffuses around the cell perimeter
++# maxXX = maximal steady state concentration of XX
++# k_XXYY = how avidly XX stimulates cleavage of YY
++# C_XX = maximum cleavage rate (CI -> CN)
++
++Parameter('K_WGen', 0.016870342)
++Parameter('nu_WGen', 8.195488)
++Parameter('H_en', 1.0 / 56.195484)
++Parameter('K_CNen', 0.0015239986)  # 0.001523986
++Parameter('nu_CNen', 5.929026)
++Parameter('H_EN', 1.0 / 26.655169)
++Parameter('H_wg', 1.0 / 65.74263)
++Parameter('K_WGwg', 0.010839762)
++Parameter('nu_WGwg', 5.2690034)
++Parameter('alpha_WGwg', 1.2893039)
++Parameter('K_CIwg', 0.1358894)
++Parameter('nu_CIwg', 3.0448556)
++Parameter('alpha_CIwg', 5.354691)
++Parameter('K_CNwg', 0.08410451)
++Parameter('nu_CNwg', 2.2106833)
++Parameter('H_IWG', 1.0 / 95.70869)
++Parameter('Endo_WG', 0.010213904)  # /6)
++Parameter('Exo_WG', 0.36542872 / 6)
++Parameter('Mxfer_WG', 0.0014474009)
++Parameter('LMxfer_WG', 0.0012071289)
++Parameter('H_EWG', 1.0 / 47.52389)
++Parameter('K_CIptc', 0.0012549695)
++Parameter('nu_CIptc', 3.5400295)
++Parameter('H_ptc', 1.0 / 62.299126)
++Parameter('K_CNptc', 0.15335482)
++Parameter('nu_CNptc', 9.436314)
++Parameter('K_PTC_HH', 0.000029159914)
++Parameter('max_HH', 200459.66)
++Parameter('H_PTC', 1.0 / 18.859844)
++Parameter('H_PTC_6th', 1.0 / (6 * 18.859844))
++Parameter('LMxfer_PTC', 0.010720446)
++Parameter('K_Bci', 0.016921775)
++Parameter('nu_Bci', 1.0)
++Parameter('H_ci', 1.0 / 88.05598)
++Parameter('K_ENci', 0.05230557)
++Parameter('nu_ENci', 3.1201758)
++Parameter('K_PTCCI', 0.13505042)
++Parameter('nu_PTCCI', 2.4668233)
++Parameter('C_CI', 0.28579983)
++Parameter('H_CI', 1.0 / 20.967995)
++Parameter('H_CN', 1.0 / 17.765957)
++Parameter('K_ENhh', 0.5281546)
++Parameter('nu_ENhh', 6.2349424)
++Parameter('H_hh', 1.0 / 44.147385)
++Parameter('K_CNhh', 0.0031077564)
++Parameter('nu_CNhh', 3.7770782)
++Parameter('max_PTC', 1894.0778)
++Parameter('H_HH', 1.0 / 28.393164)
++Parameter('H_HH_6th', 1.0 / (6 * 28.393164))
++Parameter('LMxfer_HH', 0.010256403)
++Parameter('H_PH', 1.0 / 92.6156)
++Parameter("B", 0.4)  # determines ci expression
++
++# IC's'
++Initial(en_1(), Parameter('en_1_0', 0))
++Initial(en_2(), Parameter('en_2_0', 0))
++Initial(en_3(), Parameter('en_3_0', 1.0))
++Initial(en_4(), Parameter('en_4_0', 0))
++Initial(EN_1(), Parameter('EN_1_0', 0))
++Initial(EN_2(), Parameter('EN_2_0', 0))
++Initial(EN_3(), Parameter('EN_3_0', 1.0))
++Initial(EN_4(), Parameter('EN_4_0', 0))
++Initial(wg_1(), Parameter('wg_1_0', 0))
++Initial(wg_2(), Parameter('wg_2_0', 1.0))
++Initial(wg_3(), Parameter('wg_3_0', 0))
++Initial(wg_4(), Parameter('wg_4_0', 0))
++Initial(IWG_1(), Parameter('IWG_1_0', 0))
++Initial(IWG_2(), Parameter('IWG_2_0', 1.0))
++Initial(IWG_3(), Parameter('IWG_3_0', 0))
++Initial(IWG_4(), Parameter('IWG_4_0', 0))
++Initial(EWG_1_1(), Parameter('EWG_1_1_0', 0))
++Initial(EWG_1_2(), Parameter('EWG_1_2_0', 0))
++Initial(EWG_1_3(), Parameter('EWG_1_3_0', 0))
++Initial(EWG_1_4(), Parameter('EWG_1_4_0', 0))
++Initial(EWG_1_5(), Parameter('EWG_1_5_0', 0))
++Initial(EWG_1_6(), Parameter('EWG_1_6_0', 0))
++Initial(EWG_2_1(), Parameter('EWG_2_1_0', 0))
++Initial(EWG_2_2(), Parameter('EWG_2_2_0', 0))
++Initial(EWG_2_3(), Parameter('EWG_2_3_0', 0))
++Initial(EWG_2_4(), Parameter('EWG_2_4_0', 0))
++Initial(EWG_2_5(), Parameter('EWG_2_5_0', 0))
++Initial(EWG_2_6(), Parameter('EWG_2_6_0', 0))
++Initial(EWG_3_1(), Parameter('EWG_3_1_0', 0))
++Initial(EWG_3_2(), Parameter('EWG_3_2_0', 0))
++Initial(EWG_3_3(), Parameter('EWG_3_3_0', 0))
++Initial(EWG_3_4(), Parameter('EWG_3_4_0', 0))
++Initial(EWG_3_5(), Parameter('EWG_3_5_0', 0))
++Initial(EWG_3_6(), Parameter('EWG_3_6_0', 0))
++Initial(EWG_4_1(), Parameter('EWG_4_1_0', 0))
++Initial(EWG_4_2(), Parameter('EWG_4_2_0', 0))
++Initial(EWG_4_3(), Parameter('EWG_4_3_0', 0))
++Initial(EWG_4_4(), Parameter('EWG_4_4_0', 0))
++Initial(EWG_4_5(), Parameter('EWG_4_5_0', 0))
++Initial(EWG_4_6(), Parameter('EWG_4_6_0', 0))
++Initial(ptc_1(), Parameter('ptc_1_0', 0))
++Initial(ptc_2(), Parameter('ptc_2_0', 0))
++Initial(ptc_3(), Parameter('ptc_3_0', 0))
++Initial(ptc_4(), Parameter('ptc_4_0', 0))
++Initial(PTC_1_1(), Parameter('PTC_1_1_0', 0))
++Initial(PTC_1_2(), Parameter('PTC_1_2_0', 0))
++Initial(PTC_1_3(), Parameter('PTC_1_3_0', 0))
++Initial(PTC_1_4(), Parameter('PTC_1_4_0', 0))
++Initial(PTC_1_5(), Parameter('PTC_1_5_0', 0))
++Initial(PTC_1_6(), Parameter('PTC_1_6_0', 0))
++Initial(PTC_2_1(), Parameter('PTC_2_1_0', 0))
++Initial(PTC_2_2(), Parameter('PTC_2_2_0', 0))
++Initial(PTC_2_3(), Parameter('PTC_2_3_0', 0))
++Initial(PTC_2_4(), Parameter('PTC_2_4_0', 0))
++Initial(PTC_2_5(), Parameter('PTC_2_5_0', 0))
++Initial(PTC_2_6(), Parameter('PTC_2_6_0', 0))
++Initial(PTC_3_1(), Parameter('PTC_3_1_0', 0))
++Initial(PTC_3_2(), Parameter('PTC_3_2_0', 0))
++Initial(PTC_3_3(), Parameter('PTC_3_3_0', 0))
++Initial(PTC_3_4(), Parameter('PTC_3_4_0', 0))
++Initial(PTC_3_5(), Parameter('PTC_3_5_0', 0))
++Initial(PTC_3_6(), Parameter('PTC_3_6_0', 0))
++Initial(PTC_4_1(), Parameter('PTC_4_1_0', 0))
++Initial(PTC_4_2(), Parameter('PTC_4_2_0', 0))
++Initial(PTC_4_3(), Parameter('PTC_4_3_0', 0))
++Initial(PTC_4_4(), Parameter('PTC_4_4_0', 0))
++Initial(PTC_4_5(), Parameter('PTC_4_5_0', 0))
++Initial(PTC_4_6(), Parameter('PTC_4_6_0', 0))
++Initial(ci_1(), Parameter('ci_1_0', 0))
++Initial(ci_2(), Parameter('ci_2_0', 0))
++Initial(ci_3(), Parameter('ci_3_0', 0))
++Initial(ci_4(), Parameter('ci_4_0', 0))
++Initial(CI_1(), Parameter('CI_1_0', 0))
++Initial(CI_2(), Parameter('CI_2_0', 0))  # 0.000001
++Initial(CI_3(), Parameter('CI_3_0', 0))  # 0.000001
++Initial(CI_4(), Parameter('CI_4_0', 0))  # 0.000001
++Initial(CN_1(), Parameter('CN_1_0', 0))
++Initial(CN_2(), Parameter('CN_2_0', 0))
++Initial(CN_3(), Parameter('CN_3_0', 0))
++Initial(CN_4(), Parameter('CN_4_0', 0))
++Initial(hh_1(), Parameter('hh_1_0', 0))
++Initial(hh_2(), Parameter('hh_2_0', 0))
++Initial(hh_3(), Parameter('hh_3_0', 0))
++Initial(hh_4(), Parameter('hh_4_0', 0))
++Initial(HH_1_1(), Parameter('HH_1_1_0', 0))
++Initial(HH_1_2(), Parameter('HH_1_2_0', 0))
++Initial(HH_1_3(), Parameter('HH_1_3_0', 0))
++Initial(HH_1_4(), Parameter('HH_1_4_0', 0))
++Initial(HH_1_5(), Parameter('HH_1_5_0', 0))
++Initial(HH_1_6(), Parameter('HH_1_6_0', 0))
++Initial(HH_2_1(), Parameter('HH_2_1_0', 0))
++Initial(HH_2_2(), Parameter('HH_2_2_0', 0))
++Initial(HH_2_3(), Parameter('HH_2_3_0', 0))
++Initial(HH_2_4(), Parameter('HH_2_4_0', 0))
++Initial(HH_2_5(), Parameter('HH_2_5_0', 0))
++Initial(HH_2_6(), Parameter('HH_2_6_0', 0))
++Initial(HH_3_1(), Parameter('HH_3_1_0', 0))
++Initial(HH_3_2(), Parameter('HH_3_2_0', 0))
++Initial(HH_3_3(), Parameter('HH_3_3_0', 0))
++Initial(HH_3_4(), Parameter('HH_3_4_0', 0))
++Initial(HH_3_5(), Parameter('HH_3_5_0', 0))
++Initial(HH_3_6(), Parameter('HH_3_6_0', 0))
++Initial(HH_4_1(), Parameter('HH_4_1_0', 0))
++Initial(HH_4_2(), Parameter('HH_4_2_0', 0))
++Initial(HH_4_3(), Parameter('HH_4_3_0', 0))
++Initial(HH_4_4(), Parameter('HH_4_4_0', 0))
++Initial(HH_4_5(), Parameter('HH_4_5_0', 0))
++Initial(HH_4_6(), Parameter('HH_4_6_0', 0))
++Initial(PH_1_1(), Parameter('PH_1_1_0', 0))
++Initial(PH_1_2(), Parameter('PH_1_2_0', 0))
++Initial(PH_1_3(), Parameter('PH_1_3_0', 0))
++Initial(PH_1_4(), Parameter('PH_1_4_0', 0))
++Initial(PH_1_5(), Parameter('PH_1_5_0', 0))
++Initial(PH_1_6(), Parameter('PH_1_6_0', 0))
++Initial(PH_2_1(), Parameter('PH_2_1_0', 0))
++Initial(PH_2_2(), Parameter('PH_2_2_0', 0))
++Initial(PH_2_3(), Parameter('PH_2_3_0', 0))
++Initial(PH_2_4(), Parameter('PH_2_4_0', 0))
++Initial(PH_2_5(), Parameter('PH_2_5_0', 0))
++Initial(PH_2_6(), Parameter('PH_2_6_0', 0))
++Initial(PH_3_1(), Parameter('PH_3_1_0', 0))
++Initial(PH_3_2(), Parameter('PH_3_2_0', 0))
++Initial(PH_3_3(), Parameter('PH_3_3_0', 0))
++Initial(PH_3_4(), Parameter('PH_3_4_0', 0))
++Initial(PH_3_5(), Parameter('PH_3_5_0', 0))
++Initial(PH_3_6(), Parameter('PH_3_6_0', 0))
++Initial(PH_4_1(), Parameter('PH_4_1_0', 0))
++Initial(PH_4_2(), Parameter('PH_4_2_0', 0))
++Initial(PH_4_3(), Parameter('PH_4_3_0', 0))
++Initial(PH_4_4(), Parameter('PH_4_4_0', 0))
++Initial(PH_4_5(), Parameter('PH_4_5_0', 0))
++Initial(PH_4_6(), Parameter('PH_4_6_0', 0))
++
++# Observables
++Observable('en_1_obs', en_1())
++Observable('en_2_obs', en_2())
++Observable('en_3_obs', en_3())
++Observable('en_4_obs', en_4())
++Observable('EN_1_obs', EN_1())
++Observable('EN_2_obs', EN_2())
++Observable('EN_3_obs', EN_3())
++Observable('EN_4_obs', EN_4())
++Observable('wg_1_obs', wg_1())
++Observable('wg_2_obs', wg_2())
++Observable('wg_3_obs', wg_3())
++Observable('wg_4_obs', wg_4())
++Observable('IWG_1_obs', IWG_1())
++Observable('IWG_2_obs', IWG_2())
++Observable('IWG_3_obs', IWG_3())
++Observable('IWG_4_obs', IWG_4())
++Observable('EWG_1_1_obs', EWG_1_1())
++Observable('EWG_1_2_obs', EWG_1_2())
++Observable('EWG_1_3_obs', EWG_1_3())
++Observable('EWG_1_4_obs', EWG_1_4())
++Observable('EWG_1_5_obs', EWG_1_5())
++Observable('EWG_1_6_obs', EWG_1_6())
++Observable('EWG_2_1_obs', EWG_2_1())
++Observable('EWG_2_2_obs', EWG_2_2())
++Observable('EWG_2_3_obs', EWG_2_3())
++Observable('EWG_2_4_obs', EWG_2_4())
++Observable('EWG_2_5_obs', EWG_2_5())
++Observable('EWG_2_6_obs', EWG_2_6())
++Observable('EWG_3_1_obs', EWG_3_1())
++Observable('EWG_3_2_obs', EWG_3_2())
++Observable('EWG_3_3_obs', EWG_3_3())
++Observable('EWG_3_4_obs', EWG_3_4())
++Observable('EWG_3_5_obs', EWG_3_5())
++Observable('EWG_3_6_obs', EWG_3_6())
++Observable('EWG_4_1_obs', EWG_4_1())
++Observable('EWG_4_2_obs', EWG_4_2())
++Observable('EWG_4_3_obs', EWG_4_3())
++Observable('EWG_4_4_obs', EWG_4_4())
++Observable('EWG_4_5_obs', EWG_4_5())
++Observable('EWG_4_6_obs', EWG_4_6())
++Observable('ptc_1_obs', ptc_1())
++Observable('ptc_2_obs', ptc_2())
++Observable('ptc_3_obs', ptc_3())
++Observable('ptc_4_obs', ptc_4())
++Observable('PTC_1_1_obs', PTC_1_1())
++Observable('PTC_1_2_obs', PTC_1_2())
++Observable('PTC_1_3_obs', PTC_1_3())
++Observable('PTC_1_4_obs', PTC_1_4())
++Observable('PTC_1_5_obs', PTC_1_5())
++Observable('PTC_1_6_obs', PTC_1_6())
++Observable('PTC_2_1_obs', PTC_2_1())
++Observable('PTC_2_2_obs', PTC_2_2())
++Observable('PTC_2_3_obs', PTC_2_3())
++Observable('PTC_2_4_obs', PTC_2_4())
++Observable('PTC_2_5_obs', PTC_2_5())
++Observable('PTC_2_6_obs', PTC_2_6())
++Observable('PTC_3_1_obs', PTC_3_1())
++Observable('PTC_3_2_obs', PTC_3_2())
++Observable('PTC_3_3_obs', PTC_3_3())
++Observable('PTC_3_4_obs', PTC_3_4())
++Observable('PTC_3_5_obs', PTC_3_5())
++Observable('PTC_3_6_obs', PTC_3_6())
++Observable('PTC_4_1_obs', PTC_4_1())
++Observable('PTC_4_2_obs', PTC_4_2())
++Observable('PTC_4_3_obs', PTC_4_3())
++Observable('PTC_4_4_obs', PTC_4_4())
++Observable('PTC_4_5_obs', PTC_4_5())
++Observable('PTC_4_6_obs', PTC_4_6())
++Observable('ci_1_obs', ci_1())
++Observable('ci_2_obs', ci_2())
++Observable('ci_3_obs', ci_3())
++Observable('ci_4_obs', ci_4())
++Observable('CI_1_obs', CI_1())
++Observable('CI_2_obs', CI_2())
++Observable('CI_3_obs', CI_3())
++Observable('CI_4_obs', CI_4())
++Observable('CN_1_obs', CN_1())
++Observable('CN_2_obs', CN_2())
++Observable('CN_3_obs', CN_3())
++Observable('CN_4_obs', CN_4())
++Observable('hh_1_obs', hh_1())
++Observable('hh_2_obs', hh_2())
++Observable('hh_3_obs', hh_3())
++Observable('hh_4_obs', hh_4())
++Observable('HH_1_1_obs', HH_1_1())
++Observable('HH_1_2_obs', HH_1_2())
++Observable('HH_1_3_obs', HH_1_3())
++Observable('HH_1_4_obs', HH_1_4())
++Observable('HH_1_5_obs', HH_1_5())
++Observable('HH_1_6_obs', HH_1_6())
++Observable('HH_2_1_obs', HH_2_1())
++Observable('HH_2_2_obs', HH_2_2())
++Observable('HH_2_3_obs', HH_2_3())
++Observable('HH_2_4_obs', HH_2_4())
++Observable('HH_2_5_obs', HH_2_5())
++Observable('HH_2_6_obs', HH_2_6())
++Observable('HH_3_1_obs', HH_3_1())
++Observable('HH_3_2_obs', HH_3_2())
++Observable('HH_3_3_obs', HH_3_3())
++Observable('HH_3_4_obs', HH_3_4())
++Observable('HH_3_5_obs', HH_3_5())
++Observable('HH_3_6_obs', HH_3_6())
++Observable('HH_4_1_obs', HH_4_1())
++Observable('HH_4_2_obs', HH_4_2())
++Observable('HH_4_3_obs', HH_4_3())
++Observable('HH_4_4_obs', HH_4_4())
++Observable('HH_4_5_obs', HH_4_5())
++Observable('HH_4_6_obs', HH_4_6())
++Observable('PH_1_1_obs', PH_1_1())
++Observable('PH_1_2_obs', PH_1_2())
++Observable('PH_1_3_obs', PH_1_3())
++Observable('PH_1_4_obs', PH_1_4())
++Observable('PH_1_5_obs', PH_1_5())
++Observable('PH_1_6_obs', PH_1_6())
++Observable('PH_2_1_obs', PH_2_1())
++Observable('PH_2_2_obs', PH_2_2())
++Observable('PH_2_3_obs', PH_2_3())
++Observable('PH_2_4_obs', PH_2_4())
++Observable('PH_2_5_obs', PH_2_5())
++Observable('PH_2_6_obs', PH_2_6())
++Observable('PH_3_1_obs', PH_3_1())
++Observable('PH_3_2_obs', PH_3_2())
++Observable('PH_3_3_obs', PH_3_3())
++Observable('PH_3_4_obs', PH_3_4())
++Observable('PH_3_5_obs', PH_3_5())
++Observable('PH_3_6_obs', PH_3_6())
++Observable('PH_4_1_obs', PH_4_1())
++Observable('PH_4_2_obs', PH_4_2())
++Observable('PH_4_3_obs', PH_4_3())
++Observable('PH_4_4_obs', PH_4_4())
++Observable('PH_4_5_obs', PH_4_5())
++Observable('PH_4_6_obs', PH_4_6())
++
++# Functions
++# ===============================================================================
++# def Hill(label, K, nu, obs): # takes an observable, a half-maximal concentration constant (K_XXyy) and a cooperativity coefficient (nu_XXyy)
++#     return Expression('Hill_s%' % label, sympify('%s^%s/(%s^%s + %s^%s)') % (K.name, nu.name, k.name, nu.name, obs.name, nu.name))
++#
++# def sum_nT(label, obs1, obs2, obs3, obs4, obs5, obs6):
++#     return Expression('sum_nT_s%' % label, sympify('%s + %s + %s + %s + %s + %s') % (obs1.name, obs2.name, obs3.name, obs4.name, obs5.name, obs6.name))
++#
++# def sum_iT(label, obs1, obs2, obs3, obs4, obs5, obs6):
++#     return Expression('sum_iT_s%' % label, sympify('%s + %s + %s + %s + %s + %s') % (obs1.name, obs2.name, obs3.name, obs4.name, obs5.name, obs6.name))
++# ===============================================================================
++
++# Expressions and Rules
++
++#### engrailed mRNA (en)
++
++Expression('EWG_nT_1', EWG_1_4_obs + EWG_2_5_obs + EWG_2_6_obs + EWG_1_1_obs + EWG_4_2_obs + EWG_4_3_obs)
++Expression('EWG_nT_2', EWG_2_4_obs + EWG_3_5_obs + EWG_3_6_obs + EWG_2_1_obs + EWG_1_2_obs + EWG_1_3_obs)
++Expression('EWG_nT_3', EWG_3_4_obs + EWG_4_5_obs + EWG_4_6_obs + EWG_3_1_obs + EWG_2_2_obs + EWG_2_3_obs)
++Expression('EWG_nT_4', EWG_4_4_obs + EWG_1_5_obs + EWG_1_6_obs + EWG_4_1_obs + EWG_3_2_obs + EWG_3_3_obs)
++
++Expression('Hill_CNen_1', (K_CNen ** nu_CNen) / (K_CNen ** nu_CNen + CN_1_obs ** nu_CNen))
++Expression('Hill_CNen_2', (K_CNen ** nu_CNen) / (K_CNen ** nu_CNen + CN_2_obs ** nu_CNen))
++Expression('Hill_CNen_3', (K_CNen ** nu_CNen) / (K_CNen ** nu_CNen + CN_3_obs ** nu_CNen))
++Expression('Hill_CNen_4', (K_CNen ** nu_CNen) / (K_CNen ** nu_CNen + CN_4_obs ** nu_CNen))
++
++# Expression('Hill_EWG_nT_1', (H_en*(EWG_nT_1*Hill_CNen_1**nu_WGen))/(K_WGen**nu_WGen + (EWG_nT_1*Hill_CNen_1**nu_WGen)))
++# Expression('Hill_EWG_nT_2', (H_en*(EWG_nT_2*Hill_CNen_2**nu_WGen))/(K_WGen**nu_WGen + (EWG_nT_2*Hill_CNen_2**nu_WGen)))
++# Expression('Hill_EWG_nT_3', (H_en*(EWG_nT_3*Hill_CNen_3**nu_WGen))/(K_WGen**nu_WGen + (EWG_nT_3*Hill_CNen_3**nu_WGen)))
++# Expression('Hill_EWG_nT_4', (H_en*(EWG_nT_4*Hill_CNen_4**nu_WGen))/(K_WGen**nu_WGen + (EWG_nT_4*Hill_CNen_4**nu_WGen)))
++
++Expression('Hill_EWG_nT_1',
++           (H_en * (EWG_nT_1 * Hill_CNen_1) ** nu_WGen) / (K_WGen ** nu_WGen + (EWG_nT_1 * Hill_CNen_1) ** nu_WGen))
++Expression('Hill_EWG_nT_2',
++           (H_en * (EWG_nT_2 * Hill_CNen_2) ** nu_WGen) / (K_WGen ** nu_WGen + (EWG_nT_2 * Hill_CNen_2) ** nu_WGen))
++Expression('Hill_EWG_nT_3',
++           (H_en * (EWG_nT_3 * Hill_CNen_3) ** nu_WGen) / (K_WGen ** nu_WGen + (EWG_nT_3 * Hill_CNen_3) ** nu_WGen))
++Expression('Hill_EWG_nT_4',
++           (H_en * (EWG_nT_4 * Hill_CNen_4) ** nu_WGen) / (K_WGen ** nu_WGen + (EWG_nT_4 * Hill_CNen_4) ** nu_WGen))
++
++# Cn represses expression of "protein X"
++Rule('CN_binds_gX_1', CN_1(b=None) + gX_1(b=None) | CN_1(b=1) % gX_1(b=1), kf1en_1, kr1en_1)
++Rule('CN_binds_gX_2', CN_2(b=None) + gX_2(b=None) | CN_2(b=1) % gX_2(b=1), kf1en_2, kr1en_2)
++Rule('CN_binds_gX_3', CN_3(b=None) + gX_3(b=None) | CN_3(b=1) % gX_3(b=1), kf1en_3, kr1en_3)
++Rule('CN_binds_gX_4', CN_4(b=None) + gX_4(b=None) | CN_4(b=1) % gX_4(b=1), kf1en_4, kr1en_4)
++# gX produces mX
++Rule('synthesize_mX_1', gX_1(b=None) >> gX_1(b=None) + mX_1(), k2en_1)
++Rule('synthesize_mX_2', gX_2(b=None) >> gX_2(b=None) + mX_2(), k2en_2)
++Rule('synthesize_mX_3', gX_3(b=None) >> gX_3(b=None) + mX_3(), k2en_3)
++Rule('synthesize_mX_4', gX_4(b=None) >> gX_4(b=None) + mX_4(), k2en_4)
++# mX produces pX
++Rule('synthesize_pX_1', mX_1() >> mX_1() + pX_1(b=None), k3en_1)
++Rule('synthesize_pX_2', mX_2() >> mX_2() + pX_2(b=None), k3en_2)
++Rule('synthesize_pX_3', mX_3() >> mX_3() + pX_3(b=None), k3en_3)
++Rule('synthesize_pX_4', mX_4() >> mX_4() + pX_4(b=None), k3en_4)
++#mX degrades
++Rule('degrade_mX_1', mX_1() >> None, k4en_1)
++Rule('degrade_mX_2', mX_2() >> None, k4en_2)
++Rule('degrade_mX_3', mX_3() >> None, k4en_3)
++Rule('degrade_mX_4', mX_4() >> None, k4en_4)
++#pX degrades
++Rule('degrade_pX_1', pX_1(b=None) >> None, k5en_1)
++Rule('degrade_pX_2', pX_2(b=None) >> None, k5en_2)
++Rule('degrade_pX_3', pX_3(b=None) >> None, k5en_3)
++Rule('degrade_pX_4', pX_4(b=None) >> None, k5en_4)
++
++# "Protein X" and EWG cooperatively activate en
++# protein X binds gEN
++Rule('X_binds_EN_1', pX_1(b=None) + gEN_1(b=None) | pX_1(b=1) % gEN_1(b=1), kf6en_1, kr6en_1)
++Rule('X_binds_EN_2', pX_2(b=None) + gEN_2(b=None) | pX_2(b=1) % gEN_2(b=1), kf6en_2, kr6en_2)
++Rule('X_binds_EN_3', pX_3(b=None) + gEN_3(b=None) | pX_3(b=1) % gEN_3(b=1), kf6en_3, kr6en_3)
++Rule('X_binds_EN_4', pX_4(b=None) + gEN_4(b=None) | pX_4(b=1) % gEN_4(b=1), kf6en_4, kr6en_4)
++# EWG binds already-bound-by-X-g_EN
++Rule('EWG_binds_pX_gEN_1', EWG_1(b=None) + pX_1(b=1) % gEN_1(b=1) | EWG_1(b=1) % pX_1(b=1) % gEN_1(b=1), kf7en_1, kr7en_1)
++Rule('EWG_binds_pX_gEN_2', EWG_2(b=None) + pX_2(b=1) % gEN_2(b=1) | EWG_2(b=1) % pX_2(b=1) % gEN_1(b=1), kf7en_1, kr7en_1)
++Rule('EWG_binds_pX_gEN_3', EWG_3(b=None) + pX_3(b=1) % gEN_3(b=1) | EWG_3(b=1) % pX_3(b=1) % gEN_1(b=1), kf7en_1, kr7en_1)
++Rule('EWG_binds_pX_gEN_4', EWG_4(b=None) + pX_4(b=1) % gEN_4(b=1) | EWG_4(b=1) % pX_4(b=1) % gEN_1(b=1), kf7en_1, kr7en_1)
++
++
++
++Rule('CI_cleavage_1', CI_1() >> CN_1(), Hill_PTCci_1)
++Rule('CI_cleavage_2', CI_2() >> CN_2(), Hill_PTCci_2)
++Rule('CI_cleavage_3', CI_3() >> CN_3(), Hill_PTCci_3)
++Rule('CI_cleavage_4', CI_4() >> CN_4(), Hill_PTCci_4)
++
++
++
++# ===============================================================================
++# Expression('Hill_EWG_nT_1', sympify("(H_en*(EWG_1_4_obs + EWG_2_5_obs + EWG_2_6_obs + EWG_1_1_obs + EWG_4_2_obs + EWG_4_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_1_obs**nu_CNen))**nu_WGen))/(K_WGen**nu_WGen + (EWG_1_4_obs + EWG_2_5_obs + EWG_2_6_obs + EWG_1_1_obs + EWG_4_2_obs + EWG_4_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_1_obs**nu_CNen))**nu_WGen))"))
++# Expression('Hill_EWG_nT_2', sympify("(H_en*(EWG_2_4_obs + EWG_3_5_obs + EWG_3_6_obs + EWG_2_1_obs + EWG_1_2_obs + EWG_1_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_2_obs**nu_CNen))**nu_WGen))/(K_WGen**nu_WGen + (EWG_2_4_obs + EWG_3_5_obs + EWG_3_6_obs + EWG_2_1_obs + EWG_1_2_obs + EWG_1_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_2_obs**nu_CNen))**nu_WGen))"))
++# Expression('Hill_EWG_nT_3', sympify("(H_en*(EWG_3_4_obs + EWG_4_5_obs + EWG_4_6_obs + EWG_3_1_obs + EWG_2_2_obs + EWG_2_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_3_obs**nu_CNen))**nu_WGen))/(K_WGen**nu_WGen + (EWG_3_4_obs + EWG_4_5_obs + EWG_4_6_obs + EWG_3_1_obs + EWG_2_2_obs + EWG_2_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_3_obs**nu_CNen))**nu_WGen))"))
++# Expression('Hill_EWG_nT_4', sympify("(H_en*(EWG_4_4_obs + EWG_1_5_obs + EWG_1_6_obs + EWG_4_1_obs + EWG_3_2_obs + EWG_3_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_4_obs**nu_CNen))**nu_WGen))/(K_WGen**nu_WGen + (EWG_4_4_obs + EWG_1_5_obs + EWG_1_6_obs + EWG_4_1_obs + EWG_3_2_obs + EWG_3_3_obs)*(((K_CNen**nu_CNen)/(K_CNen**nu_CNen + CN_4_obs**nu_CNen))**nu_WGen))"))
++# ===============================================================================
++
++Rule('synthesize_en_1', None >> en_1(), Hill_EWG_nT_1)
++Rule('synthesize_en_2', None >> en_2(), Hill_EWG_nT_2)
++Rule('synthesize_en_3', None >> en_3(), Hill_EWG_nT_3)
++Rule('synthesize_en_4', None >> en_4(), Hill_EWG_nT_4)
++
++Rule('degrade_en_1', en_1() >> None, H_en)
++Rule('degrade_en_2', en_2() >> None, H_en)
++Rule('degrade_en_3', en_3() >> None, H_en)
++Rule('degrade_en_4', en_4() >> None, H_en)
++
++#### engrailed protein (EN)
++
++Rule('synthesize_EN_1', en_1() >> en_1() + EN_1(), H_EN)
++Rule('synthesize_EN_2', en_2() >> en_2() + EN_2(), H_EN)
++Rule('synthesize_EN_3', en_3() >> en_3() + EN_3(), H_EN)
++Rule('synthesize_EN_4', en_4() >> en_4() + EN_4(), H_EN)
++
++Rule('degrade_EN_1', EN_1() >> None, H_EN)
++Rule('degrade_EN_2', EN_2() >> None, H_EN)
++Rule('degrade_EN_3', EN_3() >> None, H_EN)
++Rule('degrade_EN_4', EN_4() >> None, H_EN)
++
++#### wingless mRNA (wg)
++
++Expression('Hill_CNwg_1', K_CNwg ** nu_CNwg / (K_CNwg ** nu_CNwg + CN_1_obs ** nu_CNwg))
++Expression('Hill_CNwg_2', K_CNwg ** nu_CNwg / (K_CNwg ** nu_CNwg + CN_2_obs ** nu_CNwg))
++Expression('Hill_CNwg_3', K_CNwg ** nu_CNwg / (K_CNwg ** nu_CNwg + CN_3_obs ** nu_CNwg))
++Expression('Hill_CNwg_4', K_CNwg ** nu_CNwg / (K_CNwg ** nu_CNwg + CN_4_obs ** nu_CNwg))
++
++# ===============================================================================
++# Expression('Hill_CIwg_1', (CI_1_obs*Hill_CNwg_1**nu_CIwg)/(K_CIwg**nu_CIwg + CI_1_obs*Hill_CNwg_1**nu_CIwg))
++# Expression('Hill_CIwg_2', (CI_2_obs*Hill_CNwg_2**nu_CIwg)/(K_CIwg**nu_CIwg + CI_2_obs*Hill_CNwg_2**nu_CIwg))
++# Expression('Hill_CIwg_3', (CI_3_obs*Hill_CNwg_3**nu_CIwg)/(K_CIwg**nu_CIwg + CI_3_obs*Hill_CNwg_3**nu_CIwg))
++# Expression('Hill_CIwg_4', (CI_4_obs*Hill_CNwg_4**nu_CIwg)/(K_CIwg**nu_CIwg + CI_4_obs*Hill_CNwg_4**nu_CIwg))
++# ===============================================================================
++
++Expression('Hill_CIwg_1',
++           ((CI_1_obs * Hill_CNwg_1) ** nu_CIwg) / (K_CIwg ** nu_CIwg + (CI_1_obs * Hill_CNwg_1) ** nu_CIwg))
++Expression('Hill_CIwg_2',
++           ((CI_2_obs * Hill_CNwg_2) ** nu_CIwg) / (K_CIwg ** nu_CIwg + (CI_2_obs * Hill_CNwg_2) ** nu_CIwg))
++Expression('Hill_CIwg_3',
++           ((CI_3_obs * Hill_CNwg_3) ** nu_CIwg) / (K_CIwg ** nu_CIwg + (CI_3_obs * Hill_CNwg_3) ** nu_CIwg))
++Expression('Hill_CIwg_4',
++           ((CI_4_obs * Hill_CNwg_4) ** nu_CIwg) / (K_CIwg ** nu_CIwg + (CI_4_obs * Hill_CNwg_4) ** nu_CIwg))
++
++Expression('Hill_IWGwg_1', (IWG_1_obs ** nu_WGwg) / (K_WGwg ** nu_WGwg + IWG_1_obs ** nu_WGwg))
++Expression('Hill_IWGwg_2', (IWG_2_obs ** nu_WGwg) / (K_WGwg ** nu_WGwg + IWG_2_obs ** nu_WGwg))
++Expression('Hill_IWGwg_3', (IWG_3_obs ** nu_WGwg) / (K_WGwg ** nu_WGwg + IWG_3_obs ** nu_WGwg))
++Expression('Hill_IWGwg_4', (IWG_4_obs ** nu_WGwg) / (K_WGwg ** nu_WGwg + IWG_4_obs ** nu_WGwg))
++
++Expression('wg_mess_1', H_wg * (alpha_CIwg * Hill_CIwg_1 + alpha_WGwg * Hill_IWGwg_1) / (
++            1 + alpha_CIwg * Hill_CIwg_1 + alpha_WGwg * Hill_IWGwg_1))
++Expression('wg_mess_2', H_wg * (alpha_CIwg * Hill_CIwg_2 + alpha_WGwg * Hill_IWGwg_2) / (
++            1 + alpha_CIwg * Hill_CIwg_2 + alpha_WGwg * Hill_IWGwg_2))
++Expression('wg_mess_3', H_wg * (alpha_CIwg * Hill_CIwg_3 + alpha_WGwg * Hill_IWGwg_3) / (
++            1 + alpha_CIwg * Hill_CIwg_3 + alpha_WGwg * Hill_IWGwg_3))
++Expression('wg_mess_4', H_wg * (alpha_CIwg * Hill_CIwg_4 + alpha_WGwg * Hill_IWGwg_4) / (
++            1 + alpha_CIwg * Hill_CIwg_4 + alpha_WGwg * Hill_IWGwg_4))
++
++# ===============================================================================
++# Expression('wg_mess_1', sympify("H_wg*(alpha_CIwg*(CI_1_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_1_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_1_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_1_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_1_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_1_obs**nu_WGwg)))/(1 + alpha_CIwg*(CI_1_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_1_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_1_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_1_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_1_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_1_obs**nu_WGwg)))"))
++# Expression('wg_mess_2', sympify("H_wg*(alpha_CIwg*(CI_2_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_2_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_2_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_2_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_2_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_2_obs**nu_WGwg)))/(1 + alpha_CIwg*(CI_2_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_2_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_2_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_2_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_2_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_2_obs**nu_WGwg)))"))
++# Expression('wg_mess_3', sympify("H_wg*(alpha_CIwg*(CI_3_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_3_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_3_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_3_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_3_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_3_obs**nu_WGwg)))/(1 + alpha_CIwg*(CI_3_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_3_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_3_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_3_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_3_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_3_obs**nu_WGwg)))"))
++# Expression('wg_mess_4', sympify("H_wg*(alpha_CIwg*(CI_4_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_4_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_4_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_4_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_4_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_4_obs**nu_WGwg)))/(1 + alpha_CIwg*(CI_4_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_4_obs**nu_CNwg))**nu_CIwg/(K_CIwg**nu_CIwg + CI_4_obs*((K_CNwg**nu_CNwg)/(K_CNwg**nu_CNwg + CN_4_obs**nu_CNwg))**nu_CIwg)) + alpha_WGwg*(IWG_4_obs**nu_WGwg/(K_WGwg**nu_WGwg + IWG_4_obs**nu_WGwg)))"))
++# ===============================================================================
++
++Rule('synthesize_wg_1', None >> wg_1(), wg_mess_1)
++Rule('synthesize_wg_2', None >> wg_2(), wg_mess_2)
++Rule('synthesize_wg_3', None >> wg_3(), wg_mess_3)
++Rule('synthesize_wg_4', None >> wg_4(), wg_mess_4)
++
++Rule('degrade_wg_1', wg_1() >> None, H_wg)
++Rule('degrade_wg_2', wg_2() >> None, H_wg)
++Rule('degrade_wg_3', wg_3() >> None, H_wg)
++Rule('degrade_wg_4', wg_4() >> None, H_wg)
++
++#### wingless protein: intracellular (IWG) & extracellular (EWG)
++
++# synthesis & degradation
++
++Rule('synthesize_IWG_1', wg_1() >> wg_1() + IWG_1(), H_IWG)
++Rule('synthesize_IWG_2', wg_2() >> wg_2() + IWG_2(), H_IWG)
++Rule('synthesize_IWG_3', wg_3() >> wg_3() + IWG_3(), H_IWG)
++Rule('synthesize_IWG_4', wg_4() >> wg_4() + IWG_4(), H_IWG)
++
++Rule('degrade_IWG_1', IWG_1() >> None, H_IWG)
++Rule('degrade_IWG_2', IWG_2() >> None, H_IWG)
++Rule('degrade_IWG_3', IWG_3() >> None, H_IWG)
++Rule('degrade_IWG_4', IWG_4() >> None, H_IWG)
++
++Rule('degrade_EWG_1_1', EWG_1_1() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_1_2', EWG_1_2() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_1_3', EWG_1_3() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_1_4', EWG_1_4() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_1_5', EWG_1_5() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_1_6', EWG_1_6() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_1', EWG_2_1() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_2', EWG_2_2() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_3', EWG_2_3() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_4', EWG_2_4() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_5', EWG_2_5() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_2_6', EWG_2_6() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_1', EWG_3_1() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_2', EWG_3_2() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_3', EWG_3_3() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_4', EWG_3_4() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_5', EWG_3_5() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_3_6', EWG_3_6() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_1', EWG_4_1() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_2', EWG_4_2() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_3', EWG_4_3() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_4', EWG_4_4() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_5', EWG_4_5() >> None, H_EWG)  # H_IWG)
++Rule('degrade_EWG_4_6', EWG_4_6() >> None, H_EWG)  # H_IWG)
++
++# endocytosis and exocytosis
++
++Rule('endo_exo_WG_1_1', EWG_1_1() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_1_2', EWG_1_2() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_1_3', EWG_1_3() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_1_4', EWG_1_4() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_1_5', EWG_1_5() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_1_6', EWG_1_6() <> IWG_1(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_1', EWG_2_1() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_2', EWG_2_2() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_3', EWG_2_3() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_4', EWG_2_4() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_5', EWG_2_5() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_2_6', EWG_2_6() <> IWG_2(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_1', EWG_3_1() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_2', EWG_3_2() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_3', EWG_3_3() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_4', EWG_3_4() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_5', EWG_3_5() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_3_6', EWG_3_6() <> IWG_3(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_1', EWG_4_1() <> IWG_4(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_2', EWG_4_2() <> IWG_4(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_3', EWG_4_3() <> IWG_4(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_4', EWG_4_4() <> IWG_4(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_5', EWG_4_5() <> IWG_4(), Endo_WG, Exo_WG)
++Rule('endo_exo_WG_4_6', EWG_4_6() <> IWG_4(), Endo_WG, Exo_WG)
++
++# diffusion between faces: around the perimeter
++
++Rule('diffuse_EWG_1_1_2', EWG_1_1() <> EWG_1_2(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_1_2_3', EWG_1_2() <> EWG_1_3(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_1_3_4', EWG_1_3() <> EWG_1_4(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_1_4_5', EWG_1_4() <> EWG_1_5(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_1_5_6', EWG_1_5() <> EWG_1_6(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_1_6_1', EWG_1_6() <> EWG_1_1(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_1_2', EWG_2_1() <> EWG_2_2(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_2_3', EWG_2_2() <> EWG_2_3(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_3_4', EWG_2_3() <> EWG_2_4(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_4_5', EWG_2_4() <> EWG_2_5(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_5_6', EWG_2_5() <> EWG_2_6(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_2_6_1', EWG_2_6() <> EWG_2_1(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_1_2', EWG_3_1() <> EWG_3_2(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_2_3', EWG_3_2() <> EWG_3_3(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_3_4', EWG_3_3() <> EWG_3_4(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_4_5', EWG_3_4() <> EWG_3_5(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_5_6', EWG_3_5() <> EWG_3_6(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_3_6_1', EWG_3_6() <> EWG_3_1(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_1_2', EWG_4_1() <> EWG_4_2(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_2_3', EWG_4_2() <> EWG_4_3(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_3_4', EWG_4_3() <> EWG_4_4(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_4_5', EWG_4_4() <> EWG_4_5(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_5_6', EWG_4_5() <> EWG_4_6(), LMxfer_WG, LMxfer_WG)
++Rule('diffuse_EWG_4_6_1', EWG_4_6() <> EWG_4_1(), LMxfer_WG, LMxfer_WG)
++
++# diffusion between faces: cell to cell
++
++Rule('diffuse_EWG_1_1_1_4', EWG_1_1() <> EWG_1_4(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_1_2_2_5', EWG_1_2() <> EWG_2_5(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_1_3_2_6', EWG_1_3() <> EWG_2_6(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_1_5_4_2', EWG_1_5() <> EWG_4_2(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_1_6_4_3', EWG_1_6() <> EWG_4_3(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_2_1_2_4', EWG_2_1() <> EWG_2_4(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_2_2_3_5', EWG_2_2() <> EWG_3_5(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_2_3_3_6', EWG_2_3() <> EWG_3_6(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_3_1_3_4', EWG_3_1() <> EWG_3_4(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_3_2_4_5', EWG_3_2() <> EWG_4_5(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_3_3_4_6', EWG_3_3() <> EWG_4_6(), Mxfer_WG, Mxfer_WG)
++Rule('diffuse_EWG_4_1_4_4', EWG_4_1() <> EWG_4_4(), Mxfer_WG, Mxfer_WG)
++
++#### patched mRNA (ptc)
++
++Expression('Hill_CNptc_1', (K_CNptc ** nu_CNptc) / (K_CNptc ** nu_CNptc + CN_1_obs ** nu_CNptc))
++Expression('Hill_CNptc_2', (K_CNptc ** nu_CNptc) / (K_CNptc ** nu_CNptc + CN_2_obs ** nu_CNptc))
++Expression('Hill_CNptc_3', (K_CNptc ** nu_CNptc) / (K_CNptc ** nu_CNptc + CN_3_obs ** nu_CNptc))
++Expression('Hill_CNptc_4', (K_CNptc ** nu_CNptc) / (K_CNptc ** nu_CNptc + CN_4_obs ** nu_CNptc))
++
++Expression('Hill_CIptc_1', H_ptc * (CI_1_obs * Hill_CNptc_1) ** nu_CIptc / (
++            K_CIptc ** nu_CIptc + (CI_1_obs * Hill_CNptc_1) ** nu_CIptc))
++Expression('Hill_CIptc_2', H_ptc * (CI_2_obs * Hill_CNptc_2) ** nu_CIptc / (
++            K_CIptc ** nu_CIptc + (CI_2_obs * Hill_CNptc_2) ** nu_CIptc))
++Expression('Hill_CIptc_3', H_ptc * (CI_3_obs * Hill_CNptc_3) ** nu_CIptc / (
++            K_CIptc ** nu_CIptc + (CI_3_obs * Hill_CNptc_3) ** nu_CIptc))
++Expression('Hill_CIptc_4', H_ptc * (CI_4_obs * Hill_CNptc_4) ** nu_CIptc / (
++            K_CIptc ** nu_CIptc + (CI_4_obs * Hill_CNptc_4) ** nu_CIptc))
++
++# ===============================================================================
++# Expression('Hill_CIptc_1', sympify("H_ptc*CI_1_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_1_obs**nu_CNptc))**nu_CIptc/(K_CIptc**nu_CIptc + CI_1_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_1_obs**nu_CNptc))**nu_CIptc)"))
++# Expression('Hill_CIptc_2', sympify("H_ptc*CI_2_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_2_obs**nu_CNptc))**nu_CIptc/(K_CIptc**nu_CIptc + CI_2_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_2_obs**nu_CNptc))**nu_CIptc)"))
++# Expression('Hill_CIptc_3', sympify("H_ptc*CI_3_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_3_obs**nu_CNptc))**nu_CIptc/(K_CIptc**nu_CIptc + CI_3_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_3_obs**nu_CNptc))**nu_CIptc)"))
++# Expression('Hill_CIptc_4', sympify("H_ptc*CI_4_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_4_obs**nu_CNptc))**nu_CIptc/(K_CIptc**nu_CIptc + CI_4_obs*(K_CNptc**nu_CNptc/(K_CNptc**nu_CNptc + CN_4_obs**nu_CNptc))**nu_CIptc)"))
++# ===============================================================================
++
++Rule('synthesize_ptc_1', None >> ptc_1(), Hill_CIptc_1)
++Rule('synthesize_ptc_2', None >> ptc_2(), Hill_CIptc_2)
++Rule('synthesize_ptc_3', None >> ptc_3(), Hill_CIptc_3)
++Rule('synthesize_ptc_4', None >> ptc_4(), Hill_CIptc_4)
++
++Rule('degrade_ptc_1', ptc_1() >> None, H_ptc)
++Rule('degrade_ptc_2', ptc_2() >> None, H_ptc)
++Rule('degrade_ptc_3', ptc_3() >> None, H_ptc)
++Rule('degrade_ptc_4', ptc_4() >> None, H_ptc)
++
++#### patched protein (PTC)
++
++# synthesis and degradation
++
++Rule('synthesize_PTC_1_1', ptc_1() >> ptc_1() + PTC_1_1(), H_PTC_6th)
++Rule('synthesize_PTC_1_2', ptc_1() >> ptc_1() + PTC_1_2(), H_PTC_6th)
++Rule('synthesize_PTC_1_3', ptc_1() >> ptc_1() + PTC_1_3(), H_PTC_6th)
++Rule('synthesize_PTC_1_4', ptc_1() >> ptc_1() + PTC_1_4(), H_PTC_6th)
++Rule('synthesize_PTC_1_5', ptc_1() >> ptc_1() + PTC_1_5(), H_PTC_6th)
++Rule('synthesize_PTC_1_6', ptc_1() >> ptc_1() + PTC_1_6(), H_PTC_6th)
++Rule('synthesize_PTC_2_1', ptc_2() >> ptc_2() + PTC_2_1(), H_PTC_6th)
++Rule('synthesize_PTC_2_2', ptc_2() >> ptc_2() + PTC_2_2(), H_PTC_6th)
++Rule('synthesize_PTC_2_3', ptc_2() >> ptc_2() + PTC_2_3(), H_PTC_6th)
++Rule('synthesize_PTC_2_4', ptc_2() >> ptc_2() + PTC_2_4(), H_PTC_6th)
++Rule('synthesize_PTC_2_5', ptc_2() >> ptc_2() + PTC_2_5(), H_PTC_6th)
++Rule('synthesize_PTC_2_6', ptc_2() >> ptc_2() + PTC_2_6(), H_PTC_6th)
++Rule('synthesize_PTC_3_1', ptc_3() >> ptc_3() + PTC_3_1(), H_PTC_6th)
++Rule('synthesize_PTC_3_2', ptc_3() >> ptc_3() + PTC_3_2(), H_PTC_6th)
++Rule('synthesize_PTC_3_3', ptc_3() >> ptc_3() + PTC_3_3(), H_PTC_6th)
++Rule('synthesize_PTC_3_4', ptc_3() >> ptc_3() + PTC_3_4(), H_PTC_6th)
++Rule('synthesize_PTC_3_5', ptc_3() >> ptc_3() + PTC_3_5(), H_PTC_6th)
++Rule('synthesize_PTC_3_6', ptc_3() >> ptc_3() + PTC_3_6(), H_PTC_6th)
++Rule('synthesize_PTC_4_1', ptc_4() >> ptc_4() + PTC_4_1(), H_PTC_6th)
++Rule('synthesize_PTC_4_2', ptc_4() >> ptc_4() + PTC_4_2(), H_PTC_6th)
++Rule('synthesize_PTC_4_3', ptc_4() >> ptc_4() + PTC_4_3(), H_PTC_6th)
++Rule('synthesize_PTC_4_4', ptc_4() >> ptc_4() + PTC_4_4(), H_PTC_6th)
++Rule('synthesize_PTC_4_5', ptc_4() >> ptc_4() + PTC_4_5(), H_PTC_6th)
++Rule('synthesize_PTC_4_6', ptc_4() >> ptc_4() + PTC_4_6(), H_PTC_6th)
++
++Rule('degrade_PTC_1_1', PTC_1_1() >> None, H_PTC)
++Rule('degrade_PTC_1_2', PTC_1_2() >> None, H_PTC)
++Rule('degrade_PTC_1_3', PTC_1_3() >> None, H_PTC)
++Rule('degrade_PTC_1_4', PTC_1_4() >> None, H_PTC)
++Rule('degrade_PTC_1_5', PTC_1_5() >> None, H_PTC)
++Rule('degrade_PTC_1_6', PTC_1_6() >> None, H_PTC)
++Rule('degrade_PTC_2_1', PTC_2_1() >> None, H_PTC)
++Rule('degrade_PTC_2_2', PTC_2_2() >> None, H_PTC)
++Rule('degrade_PTC_2_3', PTC_2_3() >> None, H_PTC)
++Rule('degrade_PTC_2_4', PTC_2_4() >> None, H_PTC)
++Rule('degrade_PTC_2_5', PTC_2_5() >> None, H_PTC)
++Rule('degrade_PTC_2_6', PTC_2_6() >> None, H_PTC)
++Rule('degrade_PTC_3_1', PTC_3_1() >> None, H_PTC)
++Rule('degrade_PTC_3_2', PTC_3_2() >> None, H_PTC)
++Rule('degrade_PTC_3_3', PTC_3_3() >> None, H_PTC)
++Rule('degrade_PTC_3_4', PTC_3_4() >> None, H_PTC)
++Rule('degrade_PTC_3_5', PTC_3_5() >> None, H_PTC)
++Rule('degrade_PTC_3_6', PTC_3_6() >> None, H_PTC)
++Rule('degrade_PTC_4_1', PTC_4_1() >> None, H_PTC)
++Rule('degrade_PTC_4_2', PTC_4_2() >> None, H_PTC)
++Rule('degrade_PTC_4_3', PTC_4_3() >> None, H_PTC)
++Rule('degrade_PTC_4_4', PTC_4_4() >> None, H_PTC)
++Rule('degrade_PTC_4_5', PTC_4_5() >> None, H_PTC)
++Rule('degrade_PTC_4_6', PTC_4_6() >> None, H_PTC)
++
++# complexation: re-dimensionalization will allow for simplification of the second order equations involving PTC, HH, and PH
++
++Expression('PTC_1_1_2nd_order', K_PTC_HH * max_HH * HH_1_4_obs)  # *PTC_1_1_obs)
++Expression('PTC_1_2_2nd_order', K_PTC_HH * max_HH * HH_2_5_obs)  # *PTC_1_2_obs)
++Expression('PTC_1_3_2nd_order', K_PTC_HH * max_HH * HH_2_6_obs)  # *PTC_1_3_obs)
++Expression('PTC_1_4_2nd_order', K_PTC_HH * max_HH * HH_1_1_obs)  # *PTC_1_4_obs)
++Expression('PTC_1_5_2nd_order', K_PTC_HH * max_HH * HH_4_2_obs)  # *PTC_1_5_obs)
++Expression('PTC_1_6_2nd_order', K_PTC_HH * max_HH * HH_4_3_obs)  # *PTC_1_6_obs)
++Expression('PTC_2_1_2nd_order', K_PTC_HH * max_HH * HH_2_4_obs)  # *PTC_2_1_obs)
++Expression('PTC_2_2_2nd_order', K_PTC_HH * max_HH * HH_3_5_obs)  # *PTC_2_2_obs)
++Expression('PTC_2_3_2nd_order', K_PTC_HH * max_HH * HH_3_6_obs)  # *PTC_2_3_obs)
++Expression('PTC_2_4_2nd_order', K_PTC_HH * max_HH * HH_2_1_obs)  # *PTC_2_4_obs)
++Expression('PTC_2_5_2nd_order', K_PTC_HH * max_HH * HH_1_2_obs)  # *PTC_2_5_obs)
++Expression('PTC_2_6_2nd_order', K_PTC_HH * max_HH * HH_1_3_obs)  # *PTC_2_6_obs)
++Expression('PTC_3_1_2nd_order', K_PTC_HH * max_HH * HH_3_4_obs)  # *PTC_3_1_obs)
++Expression('PTC_3_2_2nd_order', K_PTC_HH * max_HH * HH_4_5_obs)  # *PTC_3_2_obs)
++Expression('PTC_3_3_2nd_order', K_PTC_HH * max_HH * HH_4_6_obs)  # *PTC_3_3_obs)
++Expression('PTC_3_4_2nd_order', K_PTC_HH * max_HH * HH_3_1_obs)  # *PTC_3_4_obs)
++Expression('PTC_3_5_2nd_order', K_PTC_HH * max_HH * HH_2_2_obs)  # *PTC_3_5_obs)
++Expression('PTC_3_6_2nd_order', K_PTC_HH * max_HH * HH_2_3_obs)  # *PTC_3_6_obs)
++Expression('PTC_4_1_2nd_order', K_PTC_HH * max_HH * HH_4_4_obs)  # *PTC_4_1_obs)
++Expression('PTC_4_2_2nd_order', K_PTC_HH * max_HH * HH_1_5_obs)  # *PTC_4_2_obs)
++Expression('PTC_4_3_2nd_order', K_PTC_HH * max_HH * HH_1_6_obs)  # *PTC_4_3_obs)
++Expression('PTC_4_4_2nd_order', K_PTC_HH * max_HH * HH_4_1_obs)  # *PTC_4_4_obs)
++Expression('PTC_4_5_2nd_order', K_PTC_HH * max_HH * HH_3_2_obs)  # *PTC_4_5_obs)
++Expression('PTC_4_6_2nd_order', K_PTC_HH * max_HH * HH_3_3_obs)  # *PTC_4_6_obs)
++
++# ===============================================================================
++# Expression('PTC_1_1_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_4_obs*PTC_1_1_obs"))
++# Expression('PTC_1_2_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_5_obs*PTC_1_2_obs"))
++# Expression('PTC_1_3_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_6_obs*PTC_1_3_obs"))
++# Expression('PTC_1_4_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_1_obs*PTC_1_4_obs"))
++# Expression('PTC_1_5_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_2_obs*PTC_1_5_obs"))
++# Expression('PTC_1_6_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_3_obs*PTC_1_6_obs"))
++# Expression('PTC_2_1_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_4_obs*PTC_2_1_obs"))
++# Expression('PTC_2_2_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_5_obs*PTC_2_2_obs"))
++# Expression('PTC_2_3_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_6_obs*PTC_2_3_obs"))
++# Expression('PTC_2_4_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_1_obs*PTC_2_4_obs"))
++# Expression('PTC_2_5_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_2_obs*PTC_2_5_obs"))
++# Expression('PTC_2_6_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_3_obs*PTC_2_6_obs"))
++# Expression('PTC_3_1_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_4_obs*PTC_3_1_obs"))
++# Expression('PTC_3_2_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_5_obs*PTC_3_2_obs"))
++# Expression('PTC_3_3_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_6_obs*PTC_3_3_obs"))
++# Expression('PTC_3_4_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_1_obs*PTC_3_4_obs"))
++# Expression('PTC_3_5_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_2_obs*PTC_3_5_obs"))
++# Expression('PTC_3_6_2nd_order', sympify("K_PTC_HH*max_HH*HH_2_3_obs*PTC_3_6_obs"))
++# Expression('PTC_4_1_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_4_obs*PTC_4_1_obs"))
++# Expression('PTC_4_2_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_5_obs*PTC_4_2_obs"))
++# Expression('PTC_4_3_2nd_order', sympify("K_PTC_HH*max_HH*HH_1_6_obs*PTC_4_3_obs"))
++# Expression('PTC_4_4_2nd_order', sympify("K_PTC_HH*max_HH*HH_4_1_obs*PTC_4_4_obs"))
++# Expression('PTC_4_5_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_2_obs*PTC_4_5_obs"))
++# Expression('PTC_4_6_2nd_order', sympify("K_PTC_HH*max_HH*HH_3_3_obs*PTC_4_6_obs"))
++# ===============================================================================
++
++Rule('PTC_to_PH_1_1', PTC_1_1() >> None, PTC_1_1_2nd_order)
++Rule('PTC_to_PH_1_2', PTC_1_2() >> None, PTC_1_2_2nd_order)
++Rule('PTC_to_PH_1_3', PTC_1_3() >> None, PTC_1_3_2nd_order)
++Rule('PTC_to_PH_1_4', PTC_1_4() >> None, PTC_1_4_2nd_order)
++Rule('PTC_to_PH_1_5', PTC_1_5() >> None, PTC_1_5_2nd_order)
++Rule('PTC_to_PH_1_6', PTC_1_6() >> None, PTC_1_6_2nd_order)
++Rule('PTC_to_PH_2_1', PTC_2_1() >> None, PTC_2_1_2nd_order)
++Rule('PTC_to_PH_2_2', PTC_2_2() >> None, PTC_2_2_2nd_order)
++Rule('PTC_to_PH_2_3', PTC_2_3() >> None, PTC_2_3_2nd_order)
++Rule('PTC_to_PH_2_4', PTC_2_4() >> None, PTC_2_4_2nd_order)
++Rule('PTC_to_PH_2_5', PTC_2_5() >> None, PTC_2_5_2nd_order)
++Rule('PTC_to_PH_2_6', PTC_2_6() >> None, PTC_2_6_2nd_order)
++Rule('PTC_to_PH_3_1', PTC_3_1() >> None, PTC_3_1_2nd_order)
++Rule('PTC_to_PH_3_2', PTC_3_2() >> None, PTC_3_2_2nd_order)
++Rule('PTC_to_PH_3_3', PTC_3_3() >> None, PTC_3_3_2nd_order)
++Rule('PTC_to_PH_3_4', PTC_3_4() >> None, PTC_3_4_2nd_order)
++Rule('PTC_to_PH_3_5', PTC_3_5() >> None, PTC_3_5_2nd_order)
++Rule('PTC_to_PH_3_6', PTC_3_6() >> None, PTC_3_6_2nd_order)
++Rule('PTC_to_PH_4_1', PTC_4_1() >> None, PTC_4_1_2nd_order)
++Rule('PTC_to_PH_4_2', PTC_4_2() >> None, PTC_4_2_2nd_order)
++Rule('PTC_to_PH_4_3', PTC_4_3() >> None, PTC_4_3_2nd_order)
++Rule('PTC_to_PH_4_4', PTC_4_4() >> None, PTC_4_4_2nd_order)
++Rule('PTC_to_PH_4_5', PTC_4_5() >> None, PTC_4_5_2nd_order)
++Rule('PTC_to_PH_4_6', PTC_4_6() >> None, PTC_4_6_2nd_order)
++
++# diffusion between faces: around the perimeter
++
++Rule('diffuse_PTC_1_1_2', PTC_1_1() <> PTC_1_2(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_1_2_3', PTC_1_2() <> PTC_1_3(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_1_3_4', PTC_1_3() <> PTC_1_4(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_1_4_5', PTC_1_4() <> PTC_1_5(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_1_5_6', PTC_1_5() <> PTC_1_6(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_1_6_1', PTC_1_6() <> PTC_1_1(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_1_2', PTC_2_1() <> PTC_2_2(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_2_3', PTC_2_2() <> PTC_2_3(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_3_4', PTC_2_3() <> PTC_2_4(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_4_5', PTC_2_4() <> PTC_2_5(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_5_6', PTC_2_5() <> PTC_2_6(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_2_6_1', PTC_2_6() <> PTC_2_1(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_1_2', PTC_3_1() <> PTC_3_2(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_2_3', PTC_3_2() <> PTC_3_3(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_3_4', PTC_3_3() <> PTC_3_4(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_4_5', PTC_3_4() <> PTC_3_5(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_5_6', PTC_3_5() <> PTC_3_6(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_3_6_1', PTC_3_6() <> PTC_3_1(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_1_2', PTC_4_1() <> PTC_4_2(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_2_3', PTC_4_2() <> PTC_4_3(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_3_4', PTC_4_3() <> PTC_4_4(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_4_5', PTC_4_4() <> PTC_4_5(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_5_6', PTC_4_5() <> PTC_4_6(), LMxfer_PTC, LMxfer_PTC)
++Rule('diffuse_PTC_4_6_1', PTC_4_6() <> PTC_4_1(), LMxfer_PTC, LMxfer_PTC)
++
++#### hedgehog mRNA (hh)
++
++Expression('Hill_CNhh_1', K_CNhh ** nu_CNhh / (K_CNhh ** nu_CNhh + CN_1_obs ** nu_CNhh))
++Expression('Hill_CNhh_2', K_CNhh ** nu_CNhh / (K_CNhh ** nu_CNhh + CN_2_obs ** nu_CNhh))
++Expression('Hill_CNhh_3', K_CNhh ** nu_CNhh / (K_CNhh ** nu_CNhh + CN_3_obs ** nu_CNhh))
++Expression('Hill_CNhh_4', K_CNhh ** nu_CNhh / (K_CNhh ** nu_CNhh + CN_4_obs ** nu_CNhh))
++
++Expression('Hill_ENhh_1',
++           H_hh * (EN_1_obs * Hill_CNhh_1) ** nu_ENhh / (K_ENhh ** nu_ENhh + (EN_1_obs * Hill_CNhh_1) ** nu_ENhh))
++Expression('Hill_ENhh_2',
++           H_hh * (EN_2_obs * Hill_CNhh_2) ** nu_ENhh / (K_ENhh ** nu_ENhh + (EN_2_obs * Hill_CNhh_2) ** nu_ENhh))
++Expression('Hill_ENhh_3',
++           H_hh * (EN_3_obs * Hill_CNhh_3) ** nu_ENhh / (K_ENhh ** nu_ENhh + (EN_3_obs * Hill_CNhh_3) ** nu_ENhh))
++Expression('Hill_ENhh_4',
++           H_hh * (EN_4_obs * Hill_CNhh_4) ** nu_ENhh / (K_ENhh ** nu_ENhh + (EN_4_obs * Hill_CNhh_4) ** nu_ENhh))
++
++# ===============================================================================
++# Expression('Hill_ENhh_1', sympify("H_hh*EN_1_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_1_obs**nu_CNhh))**nu_ENhh/(K_ENhh**nu_ENhh + EN_1_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_1_obs**nu_CNhh))**nu_ENhh)"))
++# Expression('Hill_ENhh_2', sympify("H_hh*EN_2_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_2_obs**nu_CNhh))**nu_ENhh/(K_ENhh**nu_ENhh + EN_2_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_2_obs**nu_CNhh))**nu_ENhh)"))
++# Expression('Hill_ENhh_3', sympify("H_hh*EN_3_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_3_obs**nu_CNhh))**nu_ENhh/(K_ENhh**nu_ENhh + EN_3_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_3_obs**nu_CNhh))**nu_ENhh)"))
++# Expression('Hill_ENhh_4', sympify("H_hh*EN_4_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_4_obs**nu_CNhh))**nu_ENhh/(K_ENhh**nu_ENhh + EN_4_obs*(K_CNhh**nu_CNhh/(K_CNhh**nu_CNhh + CN_4_obs**nu_CNhh))**nu_ENhh)"))
++# ===============================================================================
++
++Rule('synthesize_hh_1', None >> hh_1(), Hill_ENhh_1)
++Rule('synthesize_hh_2', None >> hh_2(), Hill_ENhh_2)
++Rule('synthesize_hh_3', None >> hh_3(), Hill_ENhh_3)
++Rule('synthesize_hh_4', None >> hh_4(), Hill_ENhh_4)
++
++Rule('degrade_hh_1', hh_1() >> None, H_hh)
++Rule('degrade_hh_2', hh_2() >> None, H_hh)
++Rule('degrade_hh_3', hh_3() >> None, H_hh)
++Rule('degrade_hh_4', hh_4() >> None, H_hh)
++
++#### hedgehog protein (HH)
++
++# synthesis and degradation
++
++Rule('synthesize_HH_1_1', hh_1() >> hh_1() + HH_1_1(), H_HH_6th)
++Rule('synthesize_HH_1_2', hh_1() >> hh_1() + HH_1_2(), H_HH_6th)
++Rule('synthesize_HH_1_3', hh_1() >> hh_1() + HH_1_3(), H_HH_6th)
++Rule('synthesize_HH_1_4', hh_1() >> hh_1() + HH_1_4(), H_HH_6th)
++Rule('synthesize_HH_1_5', hh_1() >> hh_1() + HH_1_5(), H_HH_6th)
++Rule('synthesize_HH_1_6', hh_1() >> hh_1() + HH_1_6(), H_HH_6th)
++Rule('synthesize_HH_2_1', hh_2() >> hh_2() + HH_2_1(), H_HH_6th)
++Rule('synthesize_HH_2_2', hh_2() >> hh_2() + HH_2_2(), H_HH_6th)
++Rule('synthesize_HH_2_3', hh_2() >> hh_2() + HH_2_3(), H_HH_6th)
++Rule('synthesize_HH_2_4', hh_2() >> hh_2() + HH_2_4(), H_HH_6th)
++Rule('synthesize_HH_2_5', hh_2() >> hh_2() + HH_2_5(), H_HH_6th)
++Rule('synthesize_HH_2_6', hh_2() >> hh_2() + HH_2_6(), H_HH_6th)
++Rule('synthesize_HH_3_1', hh_3() >> hh_3() + HH_3_1(), H_HH_6th)
++Rule('synthesize_HH_3_2', hh_3() >> hh_3() + HH_3_2(), H_HH_6th)
++Rule('synthesize_HH_3_3', hh_3() >> hh_3() + HH_3_3(), H_HH_6th)
++Rule('synthesize_HH_3_4', hh_3() >> hh_3() + HH_3_4(), H_HH_6th)
++Rule('synthesize_HH_3_5', hh_3() >> hh_3() + HH_3_5(), H_HH_6th)
++Rule('synthesize_HH_3_6', hh_3() >> hh_3() + HH_3_6(), H_HH_6th)
++Rule('synthesize_HH_4_1', hh_4() >> hh_4() + HH_4_1(), H_HH_6th)
++Rule('synthesize_HH_4_2', hh_4() >> hh_4() + HH_4_2(), H_HH_6th)
++Rule('synthesize_HH_4_3', hh_4() >> hh_4() + HH_4_3(), H_HH_6th)
++Rule('synthesize_HH_4_4', hh_4() >> hh_4() + HH_4_4(), H_HH_6th)
++Rule('synthesize_HH_4_5', hh_4() >> hh_4() + HH_4_5(), H_HH_6th)
++Rule('synthesize_HH_4_6', hh_4() >> hh_4() + HH_4_6(), H_HH_6th)
++
++Rule('degrade_HH_1_1', HH_1_1() >> None, H_HH)
++Rule('degrade_HH_1_2', HH_1_2() >> None, H_HH)
++Rule('degrade_HH_1_3', HH_1_3() >> None, H_HH)
++Rule('degrade_HH_1_4', HH_1_4() >> None, H_HH)
++Rule('degrade_HH_1_5', HH_1_5() >> None, H_HH)
++Rule('degrade_HH_1_6', HH_1_6() >> None, H_HH)
++Rule('degrade_HH_2_1', HH_2_1() >> None, H_HH)
++Rule('degrade_HH_2_2', HH_2_2() >> None, H_HH)
++Rule('degrade_HH_2_3', HH_2_3() >> None, H_HH)
++Rule('degrade_HH_2_4', HH_2_4() >> None, H_HH)
++Rule('degrade_HH_2_5', HH_2_5() >> None, H_HH)
++Rule('degrade_HH_2_6', HH_2_6() >> None, H_HH)
++Rule('degrade_HH_3_1', HH_3_1() >> None, H_HH)
++Rule('degrade_HH_3_2', HH_3_2() >> None, H_HH)
++Rule('degrade_HH_3_3', HH_3_3() >> None, H_HH)
++Rule('degrade_HH_3_4', HH_3_4() >> None, H_HH)
++Rule('degrade_HH_3_5', HH_3_5() >> None, H_HH)
++Rule('degrade_HH_3_6', HH_3_6() >> None, H_HH)
++Rule('degrade_HH_4_1', HH_4_1() >> None, H_HH)
++Rule('degrade_HH_4_2', HH_4_2() >> None, H_HH)
++Rule('degrade_HH_4_3', HH_4_3() >> None, H_HH)
++Rule('degrade_HH_4_4', HH_4_4() >> None, H_HH)
++Rule('degrade_HH_4_5', HH_4_5() >> None, H_HH)
++Rule('degrade_HH_4_6', HH_4_6() >> None, H_HH)
++
++# complexation: re-dimensionalization will allow for simplification of the second order equations involving PTC, HH, and PH
++
++Expression('HH_1_1_2nd_order', K_PTC_HH * max_PTC * PTC_1_4_obs)  # *HH_1_1_obs)
++Expression('HH_1_2_2nd_order', K_PTC_HH * max_PTC * PTC_2_5_obs)  # *HH_1_2_obs)
++Expression('HH_1_3_2nd_order', K_PTC_HH * max_PTC * PTC_2_6_obs)  # *HH_1_3_obs)
++Expression('HH_1_4_2nd_order', K_PTC_HH * max_PTC * PTC_1_1_obs)  # *HH_1_4_obs)
++Expression('HH_1_5_2nd_order', K_PTC_HH * max_PTC * PTC_4_2_obs)  # *HH_1_5_obs)
++Expression('HH_1_6_2nd_order', K_PTC_HH * max_PTC * PTC_4_3_obs)  # *HH_1_6_obs)
++Expression('HH_2_1_2nd_order', K_PTC_HH * max_PTC * PTC_2_4_obs)  # *HH_2_1_obs)
++Expression('HH_2_2_2nd_order', K_PTC_HH * max_PTC * PTC_3_5_obs)  # *HH_2_2_obs)
++Expression('HH_2_3_2nd_order', K_PTC_HH * max_PTC * PTC_3_6_obs)  # *HH_2_3_obs)
++Expression('HH_2_4_2nd_order', K_PTC_HH * max_PTC * PTC_2_1_obs)  # *HH_2_4_obs)
++Expression('HH_2_5_2nd_order', K_PTC_HH * max_PTC * PTC_1_2_obs)  # *HH_2_5_obs)
++Expression('HH_2_6_2nd_order', K_PTC_HH * max_PTC * PTC_1_3_obs)  # *HH_2_6_obs)
++Expression('HH_3_1_2nd_order', K_PTC_HH * max_PTC * PTC_3_4_obs)  # *HH_3_1_obs)
++Expression('HH_3_2_2nd_order', K_PTC_HH * max_PTC * PTC_4_5_obs)  # *HH_3_2_obs)
++Expression('HH_3_3_2nd_order', K_PTC_HH * max_PTC * PTC_4_6_obs)  # *HH_3_3_obs)
++Expression('HH_3_4_2nd_order', K_PTC_HH * max_PTC * PTC_3_1_obs)  # *HH_3_4_obs)
++Expression('HH_3_5_2nd_order', K_PTC_HH * max_PTC * PTC_2_2_obs)  # *HH_3_5_obs)
++Expression('HH_3_6_2nd_order', K_PTC_HH * max_PTC * PTC_2_3_obs)  # *HH_3_6_obs)
++Expression('HH_4_1_2nd_order', K_PTC_HH * max_PTC * PTC_4_4_obs)  # *HH_4_1_obs)
++Expression('HH_4_2_2nd_order', K_PTC_HH * max_PTC * PTC_1_5_obs)  # *HH_4_2_obs)
++Expression('HH_4_3_2nd_order', K_PTC_HH * max_PTC * PTC_1_6_obs)  # *HH_4_3_obs)
++Expression('HH_4_4_2nd_order', K_PTC_HH * max_PTC * PTC_4_1_obs)  # *HH_4_4_obs)
++Expression('HH_4_5_2nd_order', K_PTC_HH * max_PTC * PTC_3_2_obs)  # *HH_4_5_obs)
++Expression('HH_4_6_2nd_order', K_PTC_HH * max_PTC * PTC_3_3_obs)  # *HH_4_6_obs)
++
++# ===============================================================================
++# Expression('HH_1_1_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_4_obs*HH_1_1_obs"))
++# Expression('HH_1_2_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_5_obs*HH_1_2_obs"))
++# Expression('HH_1_3_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_6_obs*HH_1_3_obs"))
++# Expression('HH_1_4_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_1_obs*HH_1_4_obs"))
++# Expression('HH_1_5_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_2_obs*HH_1_5_obs"))
++# Expression('HH_1_6_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_3_obs*HH_1_6_obs"))
++# Expression('HH_2_1_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_4_obs*HH_2_1_obs"))
++# Expression('HH_2_2_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_5_obs*HH_2_2_obs"))
++# Expression('HH_2_3_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_6_obs*HH_2_3_obs"))
++# Expression('HH_2_4_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_1_obs*HH_2_4_obs"))
++# Expression('HH_2_5_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_2_obs*HH_2_5_obs"))
++# Expression('HH_2_6_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_3_obs*HH_2_6_obs"))
++# Expression('HH_3_1_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_4_obs*HH_3_1_obs"))
++# Expression('HH_3_2_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_5_obs*HH_3_2_obs"))
++# Expression('HH_3_3_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_6_obs*HH_3_3_obs"))
++# Expression('HH_3_4_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_1_obs*HH_3_4_obs"))
++# Expression('HH_3_5_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_2_obs*HH_3_5_obs"))
++# Expression('HH_3_6_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_2_3_obs*HH_3_6_obs"))
++# Expression('HH_4_1_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_4_obs*HH_4_1_obs"))
++# Expression('HH_4_2_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_5_obs*HH_4_2_obs"))
++# Expression('HH_4_3_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_1_6_obs*HH_4_3_obs"))
++# Expression('HH_4_4_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_4_1_obs*HH_4_4_obs"))
++# Expression('HH_4_5_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_2_obs*HH_4_5_obs"))
++# Expression('HH_4_6_2nd_order', sympify("K_PTC_HH*max_PTC*PTC_3_3_obs*HH_4_6_obs"))
++# ===============================================================================
++
++Rule('HH_to_PH_1_1', HH_1_1() >> None, HH_1_1_2nd_order)
++Rule('HH_to_PH_1_2', HH_1_2() >> None, HH_1_2_2nd_order)
++Rule('HH_to_PH_1_3', HH_1_3() >> None, HH_1_3_2nd_order)
++Rule('HH_to_PH_1_4', HH_1_4() >> None, HH_1_4_2nd_order)
++Rule('HH_to_PH_1_5', HH_1_5() >> None, HH_1_5_2nd_order)
++Rule('HH_to_PH_1_6', HH_1_6() >> None, HH_1_6_2nd_order)
++Rule('HH_to_PH_2_1', HH_2_1() >> None, HH_2_1_2nd_order)
++Rule('HH_to_PH_2_2', HH_2_2() >> None, HH_2_2_2nd_order)
++Rule('HH_to_PH_2_3', HH_2_3() >> None, HH_2_3_2nd_order)
++Rule('HH_to_PH_2_4', HH_2_4() >> None, HH_2_4_2nd_order)
++Rule('HH_to_PH_2_5', HH_2_5() >> None, HH_2_5_2nd_order)
++Rule('HH_to_PH_2_6', HH_2_6() >> None, HH_2_6_2nd_order)
++Rule('HH_to_PH_3_1', HH_3_1() >> None, HH_3_1_2nd_order)
++Rule('HH_to_PH_3_2', HH_3_2() >> None, HH_3_2_2nd_order)
++Rule('HH_to_PH_3_3', HH_3_3() >> None, HH_3_3_2nd_order)
++Rule('HH_to_PH_3_4', HH_3_4() >> None, HH_3_4_2nd_order)
++Rule('HH_to_PH_3_5', HH_3_5() >> None, HH_3_5_2nd_order)
++Rule('HH_to_PH_3_6', HH_3_6() >> None, HH_3_6_2nd_order)
++Rule('HH_to_PH_4_1', HH_4_1() >> None, HH_4_1_2nd_order)
++Rule('HH_to_PH_4_2', HH_4_2() >> None, HH_4_2_2nd_order)
++Rule('HH_to_PH_4_3', HH_4_3() >> None, HH_4_3_2nd_order)
++Rule('HH_to_PH_4_4', HH_4_4() >> None, HH_4_4_2nd_order)
++Rule('HH_to_PH_4_5', HH_4_5() >> None, HH_4_5_2nd_order)
++Rule('HH_to_PH_4_6', HH_4_6() >> None, HH_4_6_2nd_order)
++
++# diffusion between faces: around the perimeter
++
++Rule('diffuse_HH_1_1_2', HH_1_1() <> HH_1_2(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_1_2_3', HH_1_2() <> HH_1_3(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_1_3_4', HH_1_3() <> HH_1_4(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_1_4_5', HH_1_4() <> HH_1_5(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_1_5_6', HH_1_5() <> HH_1_6(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_1_6_1', HH_1_6() <> HH_1_1(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_1_2', HH_2_1() <> HH_2_2(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_2_3', HH_2_2() <> HH_2_3(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_3_4', HH_2_3() <> HH_2_4(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_4_5', HH_2_4() <> HH_2_5(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_5_6', HH_2_5() <> HH_2_6(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_2_6_1', HH_2_6() <> HH_2_1(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_1_2', HH_3_1() <> HH_3_2(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_2_3', HH_3_2() <> HH_3_3(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_3_4', HH_3_3() <> HH_3_4(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_4_5', HH_3_4() <> HH_3_5(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_5_6', HH_3_5() <> HH_3_6(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_3_6_1', HH_3_6() <> HH_3_1(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_1_2', HH_4_1() <> HH_4_2(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_2_3', HH_4_2() <> HH_4_3(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_3_4', HH_4_3() <> HH_4_4(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_4_5', HH_4_4() <> HH_4_5(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_5_6', HH_4_5() <> HH_4_6(), LMxfer_HH, LMxfer_HH)
++Rule('diffuse_HH_4_6_1', HH_4_6() <> HH_4_1(), LMxfer_HH, LMxfer_HH)
++
++#### PTC-HH complex (PH)
++
++# complexation: re-dimensionalization will allow for simplification of the second order equations involving PTC, HH, and PH
++
++Expression('PH_1_1_2nd_order', K_PTC_HH * max_HH * HH_1_4_obs * PTC_1_1_obs)
++Expression('PH_1_2_2nd_order', K_PTC_HH * max_HH * HH_2_5_obs * PTC_1_2_obs)
++Expression('PH_1_3_2nd_order', K_PTC_HH * max_HH * HH_2_6_obs * PTC_1_3_obs)
++Expression('PH_1_4_2nd_order', K_PTC_HH * max_HH * HH_1_1_obs * PTC_1_4_obs)
++Expression('PH_1_5_2nd_order', K_PTC_HH * max_HH * HH_4_2_obs * PTC_1_5_obs)
++Expression('PH_1_6_2nd_order', K_PTC_HH * max_HH * HH_4_3_obs * PTC_1_6_obs)
++Expression('PH_2_1_2nd_order', K_PTC_HH * max_HH * HH_2_4_obs * PTC_2_1_obs)
++Expression('PH_2_2_2nd_order', K_PTC_HH * max_HH * HH_3_5_obs * PTC_2_2_obs)
++Expression('PH_2_3_2nd_order', K_PTC_HH * max_HH * HH_3_6_obs * PTC_2_3_obs)
++Expression('PH_2_4_2nd_order', K_PTC_HH * max_HH * HH_2_1_obs * PTC_2_4_obs)
++Expression('PH_2_5_2nd_order', K_PTC_HH * max_HH * HH_1_2_obs * PTC_2_5_obs)
++Expression('PH_2_6_2nd_order', K_PTC_HH * max_HH * HH_1_3_obs * PTC_2_6_obs)
++Expression('PH_3_1_2nd_order', K_PTC_HH * max_HH * HH_3_4_obs * PTC_3_1_obs)
++Expression('PH_3_2_2nd_order', K_PTC_HH * max_HH * HH_4_5_obs * PTC_3_2_obs)
++Expression('PH_3_3_2nd_order', K_PTC_HH * max_HH * HH_4_6_obs * PTC_3_3_obs)
++Expression('PH_3_4_2nd_order', K_PTC_HH * max_HH * HH_3_1_obs * PTC_3_4_obs)
++Expression('PH_3_5_2nd_order', K_PTC_HH * max_HH * HH_2_2_obs * PTC_3_5_obs)
++Expression('PH_3_6_2nd_order', K_PTC_HH * max_HH * HH_2_3_obs * PTC_3_6_obs)
++Expression('PH_4_1_2nd_order', K_PTC_HH * max_HH * HH_4_4_obs * PTC_4_1_obs)
++Expression('PH_4_2_2nd_order', K_PTC_HH * max_HH * HH_1_5_obs * PTC_4_2_obs)
++Expression('PH_4_3_2nd_order', K_PTC_HH * max_HH * HH_1_6_obs * PTC_4_3_obs)
++Expression('PH_4_4_2nd_order', K_PTC_HH * max_HH * HH_4_1_obs * PTC_4_4_obs)
++Expression('PH_4_5_2nd_order', K_PTC_HH * max_HH * HH_3_2_obs * PTC_4_5_obs)
++Expression('PH_4_6_2nd_order', K_PTC_HH * max_HH * HH_3_3_obs * PTC_4_6_obs)
++
++Rule('PH_complex_1_1', None >> PH_1_1(), PH_1_1_2nd_order)
++Rule('PH_complex_1_2', None >> PH_1_2(), PH_1_2_2nd_order)
++Rule('PH_complex_1_3', None >> PH_1_3(), PH_1_3_2nd_order)
++Rule('PH_complex_1_4', None >> PH_1_4(), PH_1_4_2nd_order)
++Rule('PH_complex_1_5', None >> PH_1_5(), PH_1_5_2nd_order)
++Rule('PH_complex_1_6', None >> PH_1_6(), PH_1_6_2nd_order)
++Rule('PH_complex_2_1', None >> PH_2_1(), PH_2_1_2nd_order)
++Rule('PH_complex_2_2', None >> PH_2_2(), PH_2_2_2nd_order)
++Rule('PH_complex_2_3', None >> PH_2_3(), PH_2_3_2nd_order)
++Rule('PH_complex_2_4', None >> PH_2_4(), PH_2_4_2nd_order)
++Rule('PH_complex_2_5', None >> PH_2_5(), PH_2_5_2nd_order)
++Rule('PH_complex_2_6', None >> PH_2_6(), PH_2_6_2nd_order)
++Rule('PH_complex_3_1', None >> PH_3_1(), PH_3_1_2nd_order)
++Rule('PH_complex_3_2', None >> PH_3_2(), PH_3_2_2nd_order)
++Rule('PH_complex_3_3', None >> PH_3_3(), PH_3_3_2nd_order)
++Rule('PH_complex_3_4', None >> PH_3_4(), PH_3_4_2nd_order)
++Rule('PH_complex_3_5', None >> PH_3_5(), PH_3_5_2nd_order)
++Rule('PH_complex_3_6', None >> PH_3_6(), PH_3_6_2nd_order)
++Rule('PH_complex_4_1', None >> PH_4_1(), PH_4_1_2nd_order)
++Rule('PH_complex_4_2', None >> PH_4_2(), PH_4_2_2nd_order)
++Rule('PH_complex_4_3', None >> PH_4_3(), PH_4_3_2nd_order)
++Rule('PH_complex_4_4', None >> PH_4_4(), PH_4_4_2nd_order)
++Rule('PH_complex_4_5', None >> PH_4_5(), PH_4_5_2nd_order)
++Rule('PH_complex_4_6', None >> PH_4_6(), PH_4_6_2nd_order)
++
++# degradation
++
++Rule('degrade_PH_1_1', PH_1_1() >> None, H_PH)
++Rule('degrade_PH_1_2', PH_1_2() >> None, H_PH)
++Rule('degrade_PH_1_3', PH_1_3() >> None, H_PH)
++Rule('degrade_PH_1_4', PH_1_4() >> None, H_PH)
++Rule('degrade_PH_1_5', PH_1_5() >> None, H_PH)
++Rule('degrade_PH_1_6', PH_1_6() >> None, H_PH)
++Rule('degrade_PH_2_1', PH_2_1() >> None, H_PH)
++Rule('degrade_PH_2_2', PH_2_2() >> None, H_PH)
++Rule('degrade_PH_2_3', PH_2_3() >> None, H_PH)
++Rule('degrade_PH_2_4', PH_2_4() >> None, H_PH)
++Rule('degrade_PH_2_5', PH_2_5() >> None, H_PH)
++Rule('degrade_PH_2_6', PH_2_6() >> None, H_PH)
++Rule('degrade_PH_3_1', PH_3_1() >> None, H_PH)
++Rule('degrade_PH_3_2', PH_3_2() >> None, H_PH)
++Rule('degrade_PH_3_3', PH_3_3() >> None, H_PH)
++Rule('degrade_PH_3_4', PH_3_4() >> None, H_PH)
++Rule('degrade_PH_3_5', PH_3_5() >> None, H_PH)
++Rule('degrade_PH_3_6', PH_3_6() >> None, H_PH)
++Rule('degrade_PH_4_1', PH_4_1() >> None, H_PH)
++Rule('degrade_PH_4_2', PH_4_2() >> None, H_PH)
++Rule('degrade_PH_4_3', PH_4_3() >> None, H_PH)
++Rule('degrade_PH_4_4', PH_4_4() >> None, H_PH)
++Rule('degrade_PH_4_5', PH_4_5() >> None, H_PH)
++Rule('degrade_PH_4_6', PH_4_6() >> None, H_PH)
++
++#### cubitus interruptus mRNA (ci)
++
++# mistakes
++# ===============================================================================
++# Expression('Hill_ENci_1', K_ENci**nu_ENci/(K_ENci**nu_ENci + CN_1_obs**nu_ENci))
++# Expression('Hill_ENci_2', K_ENci**nu_ENci/(K_ENci**nu_ENci + CN_2_obs**nu_ENci))
++# Expression('Hill_ENci_3', K_ENci**nu_ENci/(K_ENci**nu_ENci + CN_3_obs**nu_ENci))
++# Expression('Hill_ENci_4', K_ENci**nu_ENci/(K_ENci**nu_ENci + CN_4_obs**nu_ENci))
++#
++# Expression('Hill_Bci_1', H_ci*CI_1_obs*Hill_ENci_1**nu_Bci/(K_Bci**nu_Bci + CI_1_obs*Hill_ENci_1**nu_Bci))
++# Expression('Hill_Bci_2', H_ci*CI_2_obs*Hill_ENci_2**nu_Bci/(K_Bci**nu_Bci + CI_2_obs*Hill_ENci_2**nu_Bci))
++# Expression('Hill_Bci_3', H_ci*CI_3_obs*Hill_ENci_3**nu_Bci/(K_Bci**nu_Bci + CI_3_obs*Hill_ENci_3**nu_Bci))
++# Expression('Hill_Bci_4', H_ci*CI_4_obs*Hill_ENci_4**nu_Bci/(K_Bci**nu_Bci + CI_4_obs*Hill_ENci_4**nu_Bci))
++# ===============================================================================
++
++Expression('Hill_ENci_1', K_ENci ** nu_ENci / (K_ENci ** nu_ENci + EN_1_obs ** nu_ENci))
++Expression('Hill_ENci_2', K_ENci ** nu_ENci / (K_ENci ** nu_ENci + EN_2_obs ** nu_ENci))
++Expression('Hill_ENci_3', K_ENci ** nu_ENci / (K_ENci ** nu_ENci + EN_3_obs ** nu_ENci))
++Expression('Hill_ENci_4', K_ENci ** nu_ENci / (K_ENci ** nu_ENci + EN_4_obs ** nu_ENci))
++
++Expression('Hill_Bci_1', H_ci * (B * Hill_ENci_1) ** nu_Bci / (K_Bci ** nu_Bci + (B * Hill_ENci_1) ** nu_Bci))
++Expression('Hill_Bci_2', H_ci * (B * Hill_ENci_2) ** nu_Bci / (K_Bci ** nu_Bci + (B * Hill_ENci_2) ** nu_Bci))
++Expression('Hill_Bci_3', H_ci * (B * Hill_ENci_3) ** nu_Bci / (K_Bci ** nu_Bci + (B * Hill_ENci_3) ** nu_Bci))
++Expression('Hill_Bci_4', H_ci * (B * Hill_ENci_4) ** nu_Bci / (K_Bci ** nu_Bci + (B * Hill_ENci_4) ** nu_Bci))
++
++# ===============================================================================
++# Expression('Hill_Bci_1', sympify("H_ci*B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_1_obs**nu_ENci))**nu_Bci/(K_Bci**nu_Bci + B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_1_obs**nu_ENci))**nu_Bci)"))
++# Expression('Hill_Bci_2', sympify("H_ci*B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_2_obs**nu_ENci))**nu_Bci/(K_Bci**nu_Bci + B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_2_obs**nu_ENci))**nu_Bci)"))
++# Expression('Hill_Bci_3', sympify("H_ci*B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_3_obs**nu_ENci))**nu_Bci/(K_Bci**nu_Bci + B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_3_obs**nu_ENci))**nu_Bci)"))
++# Expression('Hill_Bci_4', sympify("H_ci*B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_4_obs**nu_ENci))**nu_Bci/(K_Bci**nu_Bci + B*(K_ENci**nu_ENci/(K_ENci**nu_ENci + EN_4_obs**nu_ENci))**nu_Bci)"))
++# ===============================================================================
++
++Rule('synthesize_ci_1', None >> ci_1(), Hill_Bci_1)
++Rule('synthesize_ci_2', None >> ci_2(), Hill_Bci_2)
++Rule('synthesize_ci_3', None >> ci_3(), Hill_Bci_3)
++Rule('synthesize_ci_4', None >> ci_4(), Hill_Bci_4)
++
++Rule('degrade_ci_1', ci_1() >> None, H_ci)
++Rule('degrade_ci_2', ci_2() >> None, H_ci)
++Rule('degrade_ci_3', ci_3() >> None, H_ci)
++Rule('degrade_ci_4', ci_4() >> None, H_ci)
++
++#### cubitus interruptus protein (CI) and protein fragment (CN)
++
++# synthesis (CI)
++
++Rule('synthesize_CI_1', ci_1() >> ci_1() + CI_1(), H_CI)
++Rule('synthesize_CI_2', ci_2() >> ci_2() + CI_2(), H_CI)
++Rule('synthesize_CI_3', ci_3() >> ci_3() + CI_3(), H_CI)
++Rule('synthesize_CI_4', ci_4() >> ci_4() + CI_4(), H_CI)
++
++# degradation (CI)
++
++Rule('degrade_CI_1', CI_1() >> None, H_CI)
++Rule('degrade_CI_2', CI_2() >> None, H_CI)
++Rule('degrade_CI_3', CI_3() >> None, H_CI)
++Rule('degrade_CI_4', CI_4() >> None, H_CI)
++
++# degradation (CN)
++
++Rule('degrade_CN_1', CN_1() >> None, H_CN)  # H_CI)
++Rule('degrade_CN_2', CN_2() >> None, H_CN)  # H_CI)
++Rule('degrade_CN_3', CN_3() >> None, H_CN)  # H_CI)
++Rule('degrade_CN_4', CN_4() >> None, H_CN)  # H_CI)
++
++# cleavage (CI -> CN)
++
++Expression('PTC_iT_1', PTC_1_1_obs + PTC_1_2_obs + PTC_1_3_obs + PTC_1_4_obs + PTC_1_5_obs + PTC_1_6_obs)
++Expression('PTC_iT_2', PTC_2_1_obs + PTC_2_2_obs + PTC_2_3_obs + PTC_2_4_obs + PTC_2_5_obs + PTC_2_6_obs)
++Expression('PTC_iT_3', PTC_3_1_obs + PTC_3_2_obs + PTC_3_3_obs + PTC_3_4_obs + PTC_3_5_obs + PTC_3_6_obs)
++Expression('PTC_iT_4', PTC_4_1_obs + PTC_4_2_obs + PTC_4_3_obs + PTC_4_4_obs + PTC_4_5_obs + PTC_4_6_obs)
++
++Expression('Hill_PTCci_1', (C_CI * PTC_iT_1 ** nu_PTCCI) / (K_PTCCI ** nu_PTCCI + PTC_iT_1 ** nu_PTCCI))
++Expression('Hill_PTCci_2', (C_CI * PTC_iT_2 ** nu_PTCCI) / (K_PTCCI ** nu_PTCCI + PTC_iT_2 ** nu_PTCCI))
++Expression('Hill_PTCci_3', (C_CI * PTC_iT_3 ** nu_PTCCI) / (K_PTCCI ** nu_PTCCI + PTC_iT_3 ** nu_PTCCI))
++Expression('Hill_PTCci_4', (C_CI * PTC_iT_4 ** nu_PTCCI) / (K_PTCCI ** nu_PTCCI + PTC_iT_4 ** nu_PTCCI))
++
++# ===============================================================================
++# Expression('Hill_PTCci_1', sympify("(C_CI*(PTC_1_1_obs + PTC_1_2_obs + PTC_1_3_obs + PTC_1_4_obs + PTC_1_5_obs + PTC_1_6_obs)**nu_PTCCI)/(K_PTCCI**nu_PTCCI + (PTC_1_1_obs + PTC_1_2_obs + PTC_1_3_obs + PTC_1_4_obs + PTC_1_5_obs + PTC_1_6_obs)**nu_PTCCI)"))
++# Expression('Hill_PTCci_2', sympify("(C_CI*(PTC_2_1_obs + PTC_2_2_obs + PTC_2_3_obs + PTC_2_4_obs + PTC_2_5_obs + PTC_2_6_obs)**nu_PTCCI)/(K_PTCCI**nu_PTCCI + (PTC_2_1_obs + PTC_2_2_obs + PTC_2_3_obs + PTC_2_4_obs + PTC_2_5_obs + PTC_2_6_obs)**nu_PTCCI)"))
++# Expression('Hill_PTCci_3', sympify("(C_CI*(PTC_3_1_obs + PTC_3_2_obs + PTC_3_3_obs + PTC_3_4_obs + PTC_3_5_obs + PTC_3_6_obs)**nu_PTCCI)/(K_PTCCI**nu_PTCCI + (PTC_3_1_obs + PTC_3_2_obs + PTC_3_3_obs + PTC_3_4_obs + PTC_3_5_obs + PTC_3_6_obs)**nu_PTCCI)"))
++# Expression('Hill_PTCci_4', sympify("(C_CI*(PTC_4_1_obs + PTC_4_2_obs + PTC_4_3_obs + PTC_4_4_obs + PTC_4_5_obs + PTC_4_6_obs)**nu_PTCCI)/(K_PTCCI**nu_PTCCI + (PTC_4_1_obs + PTC_4_2_obs + PTC_4_3_obs + PTC_4_4_obs + PTC_4_5_obs + PTC_4_6_obs)**nu_PTCCI)"))
++# ===============================================================================
++
++Rule('CI_cleavage_1', CI_1() >> CN_1(), Hill_PTCci_1)
++Rule('CI_cleavage_2', CI_2() >> CN_2(), Hill_PTCci_2)
++Rule('CI_cleavage_3', CI_3() >> CN_3(), Hill_PTCci_3)
++Rule('CI_cleavage_4', CI_4() >> CN_4(), Hill_PTCci_4)
++
+Index: run_SPN.py
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.BaseRevisionTextPatchEP
+<+>from Model_SPN import model\nfrom pysb.integrate import odesolve\nimport numpy as np\nimport matplotlib.pyplot as plt\nimport matplotlib.patches as patches\nimport matplotlib.animation as animation\nfrom matplotlib.cm import ScalarMappable\n\nsp_names = ['en', 'EN', 'wg', 'IWG', 'EWG', 'ptc', 'PTC', 'ci', 'CI', 'CN', 'hh', 'HH', 'PH']\nn_cells = 4\n\ntspan = np.linspace(0, 1000, 501)\nx = odesolve(model, tspan, verbose=True, integrator_options = {'atol' : 1e-6, 'rtol' : 1e-6})\n\nEWG = [sum(x['EWG_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]\nPTC = [sum(x['PTC_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]\nHH =  [sum(x['HH_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]\nPH =  [sum(x['PH_%d_%d_obs' % (i+1,j+1)] for j in range(6)) for i in range(n_cells)]\n\nnames2_dict = {'EWG' : EWG, 'PTC' : PTC, 'HH'  : HH, 'PH'  : PH}\n\n# create figure\nfig1 = plt.figure(figsize=(20,20)) #figsize=(5.1, 15))\nax1 = fig1.add_subplot(111, aspect='equal')\nax1.axes.get_xaxis().set_visible(False)\nax1.axes.get_yaxis().set_visible(False)\nax1.axis([-3, 16, -27.5, 6.5])\n\ncmap = plt.get_cmap('bwr') # blue-white-red colormap\n\n# add cells (hexagons)\ny_coord = 5\nfor name in sp_names:\n    x_coord = 2\n    for cell in range(n_cells):\n        if name in names2_dict.keys():\n            obs = names2_dict[name][cell]\n        else:\n            obs = x[\"%s_%d_obs\" % (name, cell+1)]\n        ax1.add_patch(\n            patches.RegularPolygon(\n                (x_coord, y_coord - (cell % 2)*np.cos(np.pi/6)),  # (x,y)\n                6,          # number of vertices\n                1,          # radius\n                np.pi/6,\n                ec='k',\n                fc=cmap(obs[0])\n            )\n        )\n        x_coord += 1.5\n        ax1.annotate(name, xy=(-2.5, y_coord - np.cos(np.pi/6)/2), fontsize = 25)\n    y_coord -= 2.5\n\n# add current time \ntime_text = ax1.text(8,4,'t = %g' % tspan[0], fontsize = 25, color='r')\n\n# add colorbar\nsm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0, vmax=1))\nsm._A = []\ncbaxes = fig1.add_axes([0.58, 0.05, 0.03, 0.8]) # [left, bottom, width, height] -- fractions of plotting area between 0 and 1\ncb = plt.colorbar(sm, cax=cbaxes)\ncb.ax.tick_params(labelsize=20)\ncb.ax.set_ylabel('Scaled concentration', fontsize=20, labelpad=-100)\n\nplt.tight_layout()\n\ndef animate(t):\n    time_text.set_text('t = %g' % tspan[t])\n    i = 0\n    for name in sp_names:\n        for cell in range(n_cells):\n            if name in names2_dict.keys():\n                obs = names2_dict[name][cell]\n            else:\n                obs = x[\"%s_%d_obs\" % (name, cell+1)]\n            ax1.patches[i].set_fc(cmap(obs[t]))\n            i += 1   \n    return ax1.patches + [time_text]\n\nani = animation.FuncAnimation(fig1, animate, range(len(tspan)), interval=25, blit=True, repeat=False) \n\nprint 'Saving animation...'\nani.save('anim.mp4', writer='ffmpeg')\n# ani.save('anim.gif', writer='imagemagick')\nprint 'Done'\n\n##### Plot time courses #####\n\n# DATA FROM INGENUE \ndata = np.genfromtxt('TEMP/SPN_Ingenue.txt', names = ['pset', 'time', 'cell', 'species', 'conc'])\n\ny_time = [data['time'][i] for i in range(len(data['time'])) if \n        data['species'][i] == 0 and \n        data['cell'][i] == 0]\n\ny = {}\nfor i,sp in enumerate(sp_names):\n    for j in range(n_cells):\n        y['%s_%d' % (sp,j+1)] = [data['conc'][k] for k in range(len(data['conc'])) if \n        data['species'][k] == i and \n        data['cell'][k] == j]\n\n# Plot our results vs. Ingenue's\nfor name in sp_names:\n    fig, axes = plt.subplots(2, 2, sharex=True, sharey=True)\n    n = 1\n    for i in range(2):\n        for j in range(2):\n            if name in names2_dict.keys():\n                yvals = names2_dict[name][n-1]\n            else:\n                yvals = x['%s_%d_obs' % (name, n)]\n            axes[i,j].plot(tspan, yvals, lw=4, color='r', label='%s_%d' % (name, n))\n            axes[i,j].plot(y_time, y['%s_%d' % (name, n)], 'ob', mfc='None')\n            axes[i,j].legend(loc=0)\n            if i==1:\n                axes[i,j].set_xlabel('time')\n            if j==0:\n                axes[i,j].set_ylabel('scaled conc')            \n            n += 1\n    plt.tight_layout()\n#####\n\nplt.show()\n
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- run_SPN.py	(revision 041b5860cd45bbfa42209f70bc6a849c1c93472f)
++++ run_SPN.py	(date 1587846460813)
+@@ -6,6 +6,9 @@
+ import matplotlib.animation as animation
+ from matplotlib.cm import ScalarMappable
+ 
++from pysb.bng import generate_equations
++
++
+ sp_names = ['en', 'EN', 'wg', 'IWG', 'EWG', 'ptc', 'PTC', 'ci', 'CI', 'CN', 'hh', 'HH', 'PH']
+ n_cells = 4
+ 
+@@ -77,17 +80,18 @@
+             i += 1   
+     return ax1.patches + [time_text]
+ 
++
+ ani = animation.FuncAnimation(fig1, animate, range(len(tspan)), interval=25, blit=True, repeat=False) 
+ 
+ print 'Saving animation...'
+ ani.save('anim.mp4', writer='ffmpeg')
+-# ani.save('anim.gif', writer='imagemagick')
++#ani.save('anim.gif', writer='imagemagick')
+ print 'Done'
+ 
+ ##### Plot time courses #####
+ 
+ # DATA FROM INGENUE 
+-data = np.genfromtxt('TEMP/SPN_Ingenue.txt', names = ['pset', 'time', 'cell', 'species', 'conc'])
++data = np.genfromtxt('SPN_Ingenue.txt', names = ['pset', 'time', 'cell', 'species', 'conc'])
+ 
+ y_time = [data['time'][i] for i in range(len(data['time'])) if 
+         data['species'][i] == 0 and 
+Index: .idea/vcs.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/vcs.xml	(date 1580482045020)
++++ .idea/vcs.xml	(date 1580482045020)
+@@ -0,0 +1,6 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="VcsDirectoryMappings">
++    <mapping directory="$PROJECT_DIR$" vcs="Git" />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/.gitignore
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/.gitignore	(date 1580482045636)
++++ .idea/.gitignore	(date 1580482045636)
+@@ -0,0 +1,2 @@
++# Default ignored files
++/workspace.xml
+Index: .idea/modules.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/modules.xml	(date 1580482045040)
++++ .idea/modules.xml	(date 1580482045040)
+@@ -0,0 +1,8 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="ProjectModuleManager">
++    <modules>
++      <module fileurl="file://$PROJECT_DIR$/.idea/SPN.iml" filepath="$PROJECT_DIR$/.idea/SPN.iml" />
++    </modules>
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/misc.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/misc.xml	(date 1580499850419)
++++ .idea/misc.xml	(date 1580499850419)
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="JavaScriptSettings">
++    <option name="languageLevel" value="ES6" />
++  </component>
++  <component name="ProjectRootManager" version="2" project-jdk-name="Python 2.7 (b2r)" project-jdk-type="Python SDK" />
++</project>
+\ No newline at end of file
+Index: .idea/other.xml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/other.xml	(date 1587846754985)
++++ .idea/other.xml	(date 1587846754985)
+@@ -0,0 +1,7 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<project version="4">
++  <component name="PySciProjectComponent">
++    <option name="PY_SCI_VIEW_SUGGESTED" value="true" />
++    <option name="PY_MATPLOTLIB_IN_TOOLWINDOW" value="false" />
++  </component>
++</project>
+\ No newline at end of file
+Index: .idea/SPN.iml
+IDEA additional info:
+Subsystem: com.intellij.openapi.diff.impl.patch.CharsetEP
+<+>UTF-8
+===================================================================
+--- .idea/SPN.iml	(date 1580500229724)
++++ .idea/SPN.iml	(date 1580500229724)
+@@ -0,0 +1,9 @@
++<?xml version="1.0" encoding="UTF-8"?>
++<module type="PYTHON_MODULE" version="4">
++  <component name="NewModuleRootManager">
++    <content url="file://$MODULE_DIR$" />
++    <content url="file://$MODULE_DIR$/../pysb" />
++    <orderEntry type="jdk" jdkName="Python 2.7 (b2r)" jdkType="Python SDK" />
++    <orderEntry type="sourceFolder" forTests="false" />
++  </component>
++</module>
+\ No newline at end of file

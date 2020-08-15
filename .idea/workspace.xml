@@ -1,0 +1,351 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="ChangeListManager">
+    <list default="true" id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="">
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_5_1_20,_4_06_PM_[Default_Changelist]/shelved.patch" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_5_1_20__4_06_PM__Default_Changelist_.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/SPN_Ingenue.txt" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Testing/old_en.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/Testing/old_run_en.py" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/anim.mp4" afterDir="false" />
+      <change afterPath="$PROJECT_DIR$/run_mass_action.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/SPN_mass_action.py" beforeDir="false" afterPath="$PROJECT_DIR$/SPN_mass_action.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/en.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/en_Hill.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/en_Hill.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/run_en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/run_en.py" afterDir="false" />
+    </list>
+    <option name="SHOW_DIALOG" value="false" />
+    <option name="HIGHLIGHT_CONFLICTS" value="true" />
+    <option name="HIGHLIGHT_NON_ACTIVE_CHANGELIST" value="false" />
+    <option name="LAST_RESOLUTION" value="IGNORE" />
+  </component>
+  <component name="FileTemplateManagerImpl">
+    <option name="RECENT_TEMPLATES">
+      <list>
+        <option value="Python Script" />
+      </list>
+    </option>
+  </component>
+  <component name="Git.Settings">
+    <option name="RECENT_GIT_ROOT_PATH" value="$PROJECT_DIR$" />
+  </component>
+  <component name="JupyterTrust" id="c2374386-9e41-47bb-9f8c-dccf2aa2e8a3" />
+  <component name="ProjectId" id="1XAHadD6ckveiqlQTiapZYFYibr" />
+  <component name="ProjectLevelVcsManager" settingsEditedManually="true" />
+  <component name="ProjectViewState">
+    <option name="hideEmptyMiddlePackages" value="true" />
+    <option name="showLibraryContents" value="true" />
+  </component>
+  <component name="PropertiesComponent">
+    <property name="ASKED_ADD_EXTERNAL_FILES" value="true" />
+    <property name="ASKED_SHARE_PROJECT_CONFIGURATION_FILES" value="true" />
+    <property name="RunOnceActivity.OpenProjectViewOnStart" value="true" />
+    <property name="RunOnceActivity.ShowReadmeOnStart" value="true" />
+    <property name="WebServerToolWindowFactoryState" value="false" />
+    <property name="last_opened_file_path" value="$PROJECT_DIR$/../pysb" />
+    <property name="node.js.detected.package.eslint" value="true" />
+    <property name="node.js.detected.package.tslint" value="true" />
+    <property name="node.js.path.for.package.eslint" value="project" />
+    <property name="node.js.path.for.package.tslint" value="project" />
+    <property name="node.js.selected.package.eslint" value="(autodetect)" />
+    <property name="node.js.selected.package.tslint" value="(autodetect)" />
+    <property name="settings.editor.selected.configurable" value="PyScientificConfigurable" />
+  </component>
+  <component name="RunManager" selected="Python.run_en">
+    <configuration name="old_run_en" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="SPN" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Testing" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Testing/old_run_en.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="run_SPN" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="SPN" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/run_SPN.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="run_en" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="SPN" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$/Testing" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/Testing/run_en.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <configuration name="run_mass_action" type="PythonConfigurationType" factoryName="Python" temporary="true" nameIsGenerated="true">
+      <module name="SPN" />
+      <option name="INTERPRETER_OPTIONS" value="" />
+      <option name="PARENT_ENVS" value="true" />
+      <envs>
+        <env name="PYTHONUNBUFFERED" value="1" />
+      </envs>
+      <option name="SDK_HOME" value="" />
+      <option name="WORKING_DIRECTORY" value="$PROJECT_DIR$" />
+      <option name="IS_MODULE_SDK" value="true" />
+      <option name="ADD_CONTENT_ROOTS" value="true" />
+      <option name="ADD_SOURCE_ROOTS" value="true" />
+      <EXTENSION ID="PythonCoverageRunConfigurationExtension" runner="coverage.py" />
+      <option name="SCRIPT_NAME" value="$PROJECT_DIR$/run_mass_action.py" />
+      <option name="PARAMETERS" value="" />
+      <option name="SHOW_COMMAND_LINE" value="false" />
+      <option name="EMULATE_TERMINAL" value="false" />
+      <option name="MODULE_MODE" value="false" />
+      <option name="REDIRECT_INPUT" value="false" />
+      <option name="INPUT_FILE" value="" />
+      <method v="2" />
+    </configuration>
+    <recent_temporary>
+      <list>
+        <item itemvalue="Python.run_en" />
+        <item itemvalue="Python.old_run_en" />
+        <item itemvalue="Python.run_mass_action" />
+        <item itemvalue="Python.run_SPN" />
+      </list>
+    </recent_temporary>
+  </component>
+  <component name="SpellCheckerSettings" RuntimeDictionaries="0" Folders="0" CustomDictionaries="0" DefaultDictionary="application-level" UseSingleDictionary="true" transferred="true" />
+  <component name="SvnConfiguration">
+    <configuration />
+  </component>
+  <component name="TaskManager">
+    <task active="true" id="Default" summary="Default task">
+      <changelist id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="" />
+      <created>1580482043652</created>
+      <option name="number" value="Default" />
+      <option name="presentableId" value="Default" />
+      <updated>1580482043652</updated>
+      <workItem from="1580482045293" duration="1882000" />
+      <workItem from="1580504655482" duration="1916000" />
+      <workItem from="1580506698324" duration="694000" />
+      <workItem from="1581358741260" duration="616000" />
+      <workItem from="1581359902553" duration="607000" />
+      <workItem from="1581360856029" duration="631000" />
+      <workItem from="1581434799194" duration="1490000" />
+      <workItem from="1581449152686" duration="248000" />
+      <workItem from="1581449582492" duration="102000" />
+      <workItem from="1581458511930" duration="603000" />
+      <workItem from="1581459682555" duration="467000" />
+      <workItem from="1581460255498" duration="59000" />
+      <workItem from="1581518591160" duration="198000" />
+      <workItem from="1581518905554" duration="49000" />
+      <workItem from="1581519876612" duration="19000" />
+      <workItem from="1581519910329" duration="206000" />
+      <workItem from="1581520125309" duration="583000" />
+      <workItem from="1581520935782" duration="126000" />
+      <workItem from="1581521131348" duration="12000" />
+      <workItem from="1581710287862" duration="600000" />
+      <workItem from="1581714755863" duration="10000" />
+      <workItem from="1584495572841" duration="1518000" />
+      <workItem from="1587844566343" duration="1000" />
+      <workItem from="1587845778430" duration="1592000" />
+      <workItem from="1587854783178" duration="4907000" />
+      <workItem from="1587936970393" duration="3585000" />
+      <workItem from="1587941388267" duration="2041000" />
+      <workItem from="1587944316930" duration="2748000" />
+      <workItem from="1587947876795" duration="3049000" />
+      <workItem from="1587959818058" duration="1554000" />
+      <workItem from="1588005457314" duration="2451000" />
+      <workItem from="1588009122368" duration="1086000" />
+      <workItem from="1588010511839" duration="20000" />
+      <workItem from="1588010657275" duration="245000" />
+      <workItem from="1588010974832" duration="239000" />
+      <workItem from="1588011289554" duration="1561000" />
+      <workItem from="1588025754739" duration="37000" />
+      <workItem from="1588026063730" duration="34000" />
+      <workItem from="1588031137606" duration="2097000" />
+      <workItem from="1588035323820" duration="5533000" />
+      <workItem from="1588042265131" duration="27000" />
+      <workItem from="1588097519074" duration="156000" />
+      <workItem from="1588098539674" duration="59000" />
+      <workItem from="1588098994290" duration="120000" />
+      <workItem from="1588099258160" duration="17000" />
+      <workItem from="1588099688039" duration="13000" />
+      <workItem from="1588100052728" duration="1621000" />
+      <workItem from="1588119546911" duration="319000" />
+      <workItem from="1588120024094" duration="96000" />
+      <workItem from="1588120471475" duration="659000" />
+      <workItem from="1588126480771" duration="176000" />
+      <workItem from="1588128009964" duration="94000" />
+      <workItem from="1588131660025" duration="5000" />
+      <workItem from="1588131853410" duration="105000" />
+      <workItem from="1588132078317" duration="111000" />
+      <workItem from="1588132331162" duration="444000" />
+      <workItem from="1588175257447" duration="261000" />
+      <workItem from="1588206141753" duration="65000" />
+      <workItem from="1588212211800" duration="81000" />
+      <workItem from="1588216828555" duration="37000" />
+      <workItem from="1588273035628" duration="124000" />
+      <workItem from="1588273420793" duration="130000" />
+      <workItem from="1588275983041" duration="3000" />
+      <workItem from="1588367148163" duration="471000" />
+      <workItem from="1588367627293" duration="86000" />
+      <workItem from="1588368358482" duration="3298000" />
+      <workItem from="1588375090486" duration="572000" />
+      <workItem from="1588439254896" duration="5868000" />
+      <workItem from="1588450181246" duration="8484000" />
+      <workItem from="1588458709836" duration="1084000" />
+      <workItem from="1588460030318" duration="67000" />
+      <workItem from="1588460170832" duration="2723000" />
+      <workItem from="1588463320232" duration="336000" />
+      <workItem from="1588615732302" duration="8168000" />
+      <workItem from="1588626746646" duration="12927000" />
+      <workItem from="1588642767547" duration="3184000" />
+      <workItem from="1588650036798" duration="5446000" />
+      <workItem from="1588700887379" duration="9336000" />
+      <workItem from="1588778196709" duration="6400000" />
+      <workItem from="1588796079144" duration="544000" />
+      <workItem from="1588796994177" duration="3231000" />
+      <workItem from="1588800353007" duration="4737000" />
+      <workItem from="1588806671126" duration="4906000" />
+      <workItem from="1588819323143" duration="1330000" />
+      <workItem from="1588820848984" duration="6302000" />
+      <workItem from="1588875021714" duration="43000" />
+      <workItem from="1588876741525" duration="1739000" />
+      <workItem from="1588884432863" duration="4521000" />
+      <workItem from="1588959097769" duration="1661000" />
+      <workItem from="1588963091538" duration="661000" />
+      <workItem from="1588963824856" duration="1071000" />
+      <workItem from="1588965004610" duration="2936000" />
+      <workItem from="1588968891212" duration="1979000" />
+      <workItem from="1588970944762" duration="3335000" />
+      <workItem from="1588974358262" duration="1095000" />
+      <workItem from="1588975518658" duration="1269000" />
+      <workItem from="1588976951365" duration="10087000" />
+      <workItem from="1588988761344" duration="28000" />
+      <workItem from="1588988803886" duration="3108000" />
+      <workItem from="1588991987263" duration="7903000" />
+      <workItem from="1589062588270" duration="1304000" />
+      <workItem from="1589145725606" duration="764000" />
+      <workItem from="1589228181895" duration="1210000" />
+      <workItem from="1589315757749" duration="4000" />
+      <workItem from="1591740929925" duration="600000" />
+      <workItem from="1594924736197" duration="1000" />
+      <workItem from="1595441358773" duration="10000" />
+      <workItem from="1595463297175" duration="147000" />
+      <workItem from="1595958451286" duration="1303000" />
+      <workItem from="1596049786647" duration="4009000" />
+      <workItem from="1596156761735" duration="596000" />
+      <workItem from="1596487695352" duration="704000" />
+      <workItem from="1596502465531" duration="9316000" />
+      <workItem from="1597161083915" duration="13595000" />
+      <workItem from="1597354099022" duration="37795000" />
+    </task>
+    <task id="LOCAL-00001" summary="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs.">
+      <created>1589145890478</created>
+      <option name="number" value="00001" />
+      <option name="presentableId" value="LOCAL-00001" />
+      <option name="project" value="LOCAL" />
+      <updated>1589145890478</updated>
+    </task>
+    <option name="localTasksCounter" value="2" />
+    <servers />
+  </component>
+  <component name="TypeScriptGeneratedFilesManager">
+    <option name="version" value="3" />
+  </component>
+  <component name="VcsManagerConfiguration">
+    <MESSAGE value="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs." />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs." />
+  </component>
+  <component name="WindowStateProjectService">
+    <state x="101" y="6" width="1145" height="714" key="CommitChangelistDialog2" timestamp="1589145890350">
+      <screen x="72" y="27" width="1208" height="693" />
+    </state>
+    <state x="101" y="6" width="1145" height="714" key="CommitChangelistDialog2/72.27.1208.693@72.27.1208.693" timestamp="1589145890350" />
+    <state width="949" height="153" key="GridCell.Tab.0.bottom" timestamp="1597441889818">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state width="1162" height="160" key="GridCell.Tab.0.bottom/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
+    <state width="522" height="160" key="GridCell.Tab.0.bottom/72.27.568.453@72.27.568.453" timestamp="1597370369058" />
+    <state width="949" height="153" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
+    <state width="949" height="153" key="GridCell.Tab.0.center" timestamp="1597441889818">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state width="1162" height="160" key="GridCell.Tab.0.center/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
+    <state width="522" height="160" key="GridCell.Tab.0.center/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
+    <state width="949" height="153" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
+    <state width="949" height="153" key="GridCell.Tab.0.left" timestamp="1597441889817">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state width="1162" height="160" key="GridCell.Tab.0.left/72.27.1208.693@72.27.1208.693" timestamp="1597369936151" />
+    <state width="522" height="160" key="GridCell.Tab.0.left/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
+    <state width="949" height="153" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1597441889817" />
+    <state width="949" height="153" key="GridCell.Tab.0.right" timestamp="1597441889818">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state width="1162" height="160" key="GridCell.Tab.0.right/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
+    <state width="522" height="160" key="GridCell.Tab.0.right/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
+    <state width="949" height="153" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
+    <state x="466" y="6" width="415" height="661" key="RollbackChangesDialog" timestamp="1589062613779">
+      <screen x="72" y="27" width="1208" height="693" />
+    </state>
+    <state x="466" y="6" width="415" height="661" key="RollbackChangesDialog/72.27.1208.693@72.27.1208.693" timestamp="1589062613779" />
+    <state x="274" y="88" width="800" height="556" key="Vcs.Push.Dialog.v2" timestamp="1589145901537">
+      <screen x="72" y="27" width="1208" height="693" />
+    </state>
+    <state x="274" y="88" width="800" height="556" key="Vcs.Push.Dialog.v2/72.27.1208.693@72.27.1208.693" timestamp="1589145901537" />
+    <state x="72" y="27" width="617" height="693" key="find.popup" timestamp="1596060246034">
+      <screen x="72" y="27" width="1208" height="693" />
+    </state>
+    <state x="72" y="27" width="617" height="693" key="find.popup/72.27.1208.693@72.27.1208.693" timestamp="1596060246034" />
+    <state x="232" y="26" width="672" height="678" key="search.everywhere.popup" timestamp="1597418337192">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state x="232" y="26" width="672" height="678" key="search.everywhere.popup/72.27.995.573@72.27.995.573" timestamp="1597418337192" />
+  </component>
+  <component name="com.intellij.coverage.CoverageDataManagerImpl">
+    <SUITE FILE_PATH="coverage/SPN$run_SPN.coverage" NAME="run_SPN Coverage Results" MODIFIED="1587846760070" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SPN$Model_SPN_massaction.coverage" NAME="Model_SPN_massaction Coverage Results" MODIFIED="1581449677974" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+    <SUITE FILE_PATH="coverage/SPN$old_run_en.coverage" NAME="old_run_en Coverage Results" MODIFIED="1597422598903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
+    <SUITE FILE_PATH="coverage/SPN$run_en.coverage" NAME="run_en Coverage Results" MODIFIED="1597441889806" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
+    <SUITE FILE_PATH="coverage/SPN$run_mass_action.coverage" NAME="run_mass_action Coverage Results" MODIFIED="1596061151073" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
+  </component>
+</project>

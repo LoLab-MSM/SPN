@@ -19,11 +19,15 @@ def create_model(nu_wg, nu_cn):
     Parameter('H_EWG', 1.0 / 47.52389)
     Parameter('ktr_wg', 1)
     Parameter('ktl_WG', 1)
+    Parameter('kdeg_wg', 1)
+    Parameter('kdeg_WG', 1)
     Parameter('H_ci', 1.0 / 88.05598)
     Parameter('H_CI', 1.0 / 20.967995)  #Parameter('H_CI', 1.0 / 20.967995), Parameter('H_CN', 1.0 / 17.765957)
     Parameter('H_CN', 1.0 / 17.765957)
     Parameter('ktr_ci', 1)
     Parameter('ktl_CI', 1)
+    Parameter('kdeg_ci', 1)
+    Parameter('kdeg_CI', 1)
     #########################################
     
     ########### MECHANISTIC MODEL ###########
@@ -49,7 +53,11 @@ def create_model(nu_wg, nu_cn):
     Monomer('gEN', ['ewg_X1'])
     Monomer('en')
 
-    
+    Monomer('gEWG')
+    Monomer('mEWG')
+    Monomer('gCN')
+    Monomer('mCN')
+
     #print (model.monomers)
 #     print
 
@@ -65,10 +73,15 @@ def create_model(nu_wg, nu_cn):
     Initial(gEN(ewg_X1=None), Parameter('gEN_0',1))
     Initial(en(), Parameter('en_0'))
 
+    Initial(gEWG,Parameter('gEWG_0',1))
+    Initial(gCN,Parameter('gCN_0',1))
     #for ic in model.initial_conditions:
     #    print ic
 #     print
-    
+
+    #Observable('mEWG',mEWG())
+    #Observable('mCN',mCN())
+
     Observable('pEWG_tot', pEWG())
     Observable('pEWG_free', pEWG(ewg_l=None, ewg_r=None, gEN=None, X1=None))
 #     Observable('pEWG_free', MonomerPattern(mon_pEWG, {s : None for s in mon_pEWG.sites}, None))    
@@ -85,67 +98,26 @@ def create_model(nu_wg, nu_cn):
 #     print model.observables
 #     print
 
-    # Parameter('kf_ewg_olig', 1e8)
-    # Parameter('kr_ewg_olig', 1e9)
-    # Parameter('kf_g_ewg', 1e8*10**(order_WGen-1))
-    # # kr = kf * (Kappa/H)^n / K1^(n-1)
-    # Parameter('kr_g_ewg', kf_g_ewg.value * \
-    #           (K_WGen.value / H_en.value)**order_WGen * \
-    #           (kf_ewg_olig.value / kr_ewg_olig.value)**(order_WGen-1))
-    # Parameter('ktr_en', 1)
-
     # pCN oligomerization rules (x + y <> z)
-    ## Know that CN doesnt bind to EWG anymore
     Parameter('kf_cn_olig', 1e8)
     Parameter('kr_cn_olig', 1e9)
-    # Parameter('kf_cn_ewg', 1e8*10**(order_CNen-1))
-    # kr = kf * (Kappa/H)^n / K1^(n-1)
-    # Parameter('kr_cn_ewg', kf_cn_ewg.value * \
-    #         (K_CNen.value / H_en.value)**order_CNen * \
-    #         (kf_cn_olig.value / kr_cn_olig.value)**(order_CNen-1))
-    ## But it does bind to pX1
-    Parameter('kf_cn_x1', 1e8 * 10 ** (order_CNen - 1))
-    # kr = kf * (Kappa)^n / K1^(n-1)
+    Parameter('kf_cn_x1', 1e8)# * 10 ** (order_CNen - 1))
     Parameter('kr_cn_x1', kf_cn_x1.value * \
-              (K_CNen.value) ** order_CNen * \
+              (K_CNen.value/(H_CN.value*H_ci.value)) ** order_CNen * \
               (kf_cn_olig.value / kr_cn_olig.value) ** (order_CNen - 1))
-    Parameter('ktr_x1', 1)
-    Parameter('ktl_x1', 1)
-    Parameter('kdeg_mx1', 1)
-    Parameter('kdeg_px1', 1)
+    Parameter('ktr_x1', 1e8)
+    Parameter('ktl_x1', 1e9)
+    Parameter('kdeg_mx1', 1e9)
+    Parameter('kdeg_px1', 1e8)
 
-    print kf_cn_x1.value
-    print kr_cn_x1.value
+    print (kf_cn_x1.value)
+    print (kr_cn_x1.value)
     K1 = kr_cn_olig.value / kf_cn_olig.value
     K2 = kr_cn_x1.value / kf_cn_x1.value
     print (K1 ** (order_CNen - 1) * K2) ** (1. / order_CNen)
-    print K_CNen.value
+    print (K_CNen.value / (H_CN.value*H_ci.value))
 
-#     print kr_g_ewg.value
-#     K1 = kr_ewg_olig.value / kf_ewg_olig.value
-#     K2 = kr_g_ewg.value / kf_g_ewg.value
-#     print (K1**(order_WGen-1)*K2)**(1./order_WGen) * H_en.value
-#     print K_WGen.value
-#     print
 
-# #    ## Not currently doing sequential...
-#     # pEWG oligomerization rules (x + y <> z)
-#     x = pEWG(ewg_l=None, ewg_r=None, cn0=None)
-#     for i in range(order_WGen - 1):
-#         reactants = []
-#         products = [pEWG(ewg_l=None, ewg_r=i, cn0=None)]
-#         for j in range(i + 1):
-#             # reactant pattern
-#             left = None if j == 0 else j - 1
-#             right = None if j == i else j
-#             reactants.append(pEWG(ewg_l=left, ewg_r=right, cn0=None))
-#             # product pattern
-#             left = i if j == 0 else j - 1
-#             products.append(pEWG(ewg_l=left, ewg_r=right, cn0=None))
-#         y = ComplexPattern(reactants, None)
-#         z = ComplexPattern(products, None)
-#         Rule('EWG_oligomerize_1_%d_to_%d' % (i + 1, i + 2), x + y | z, kf_ewg_olig, kr_ewg_olig)
-#
     # pCN oligomerization rules (x + y <> z)
     x = pCN(cn_l=None, cn_r=None, X1=None)
     for i in range(order_CNen-1):
@@ -162,6 +134,7 @@ def create_model(nu_wg, nu_cn):
         y = ComplexPattern(reactants, None)
         z = ComplexPattern(products, None)
         Rule('CN_oligomerize_%d_to_%d' % (i+1, i+2), x + y | z, kf_cn_olig, kr_cn_olig)
+
 # #
 #     # # Promoter binding rule
 #     # olig_unbound = z.copy()
@@ -190,17 +163,7 @@ def create_model(nu_wg, nu_cn):
     olig_bound.append(g_bound)
     bound_complex = ComplexPattern(olig_bound,None)
     Rule('CN_binds_X1_promoter', olig_unbound + g_unbound | bound_complex, kf_cn_x1, kr_cn_x1)
-#
-#     # Transcription rule
-#     #mp = MonomerPattern(mon_gEN, {s : ANY for s in mon_gEN.sites}, None)
-#     #Rule('EN_transcription', mp >> mp + mEN(), ktr_en)
-#
-    # Transcription rule
-    #mp = MonomerPattern(mon_gEN, {s : ANY for s in mon_gEN.sites}, None)
     Rule('X1_transcription', gX1(CN_oligomer=None) >> gX1(CN_oligomer=None) + mX1(), ktr_x1)
-
-    # Degradation rule
-    #Rule('mRNA_degradation', mEN() >> None, H_en)
 
     # Degradation rule
     Rule('mX1_degradation', mX1() >> None, kdeg_mx1)
@@ -211,39 +174,7 @@ def create_model(nu_wg, nu_cn):
     # Degradation rule
     Rule('pX1_degradation', pX1(x1_l=None, x1_r=None, EWG=None) >> None, kdeg_px1)
 
-#     ## Know that CN doesnt bind to EWG anymore
-#     #Parameter('kf_cn_olig', 1e8)
-#     #Parameter('kr_cn_olig', 1e9)
-#     #Parameter('kf_cn_ewg', 1e8*10**(order_CNen-1))
-#     # kr = kf * (Kappa/H)^n / K1^(n-1)
-#     #Parameter('kr_cn_ewg', kf_cn_ewg.value * \
-#     #          (K_CNen.value / H_en.value)**order_CNen * \
-#     #          (kf_cn_olig.value / kr_cn_olig.value)**(order_CNen-1))
-#
-# #     print kr_cn_ewg.value
-# #     K1 = kr_cn_olig.value / kf_cn_olig.value
-# #     K2 = kr_cn_ewg.value / kf_cn_ewg.value
-# #     print (K1**(order_CNen-1)*K2)**(1./order_CNen) * H_en.value
-# #     print K_CNen.value
-# #     print
-#
-#     # # pCN-pEWG binding rule
-#     # olig_unbound = z.copy()
-#     # bound_complex = z.copy()
-#     # ewg_unbound = MonomerPattern(mon_pEWG, {s : None for s in mon_pEWG.sites}, None)
-#     # ewg_bound = MonomerPattern(mon_pEWG, {s : None for s in mon_pEWG.sites}, None)
-#     # j = order_CNen-1
-#     # for mp1,mp2,site in zip(olig_unbound.monomer_patterns,
-#     #                         bound_complex.monomer_patterns,
-#     #                         ewg_bound.monomer.sites[3:]):
-#     #     mp1.site_conditions['ewg'] = None
-#     #     mp2.site_conditions['ewg'] = j
-#     #     ewg_bound.site_conditions[site] = j
-#     #     j += 1
-#     # bound_complex.monomer_patterns.append(ewg_bound)
-#     # Rule('CN_binds_EWG', olig_unbound + ewg_unbound | bound_complex, kf_cn_ewg, kr_cn_ewg)
-#
-    ## EWG:pX1 oligomerization rule
+   ## EWG:pX1 oligomerization rule
     ## Based on Leonard's reading of the supplement it seems that an 8-mer of the EWG:X1 complex
     ##  is what binds to gEN in order to get transcription
     ## Currently going to set it up as 8 pairs of EWG:pX1 bound together through EWG
@@ -252,23 +183,21 @@ def create_model(nu_wg, nu_cn):
 
     Parameter('kf_ewg_olig', 1e8)
     Parameter('kr_ewg_olig', 1e9)
-    #Parameter('kf_ewg_olig', 3e8)
-    #Parameter('kr_ewg_olig', 1e9)
-    Parameter('kf_g_ewg', 1e8*10**(sum([order_WGen + (order_WGen - 1)])))
+    Parameter('kf_g_ewg', 1e8)
     # kr = kf * (Kappa/H)^n / K1^(sum([n+n-1]))
-    # used to be (K_WGen.value / H_en.value)**order_WGen
     Parameter('kr_g_ewg', kf_g_ewg.value * \
-              (K_WGen.value)**order_WGen * \
+              (K_WGen.value/(H_EWG.value*H_wg.value))**order_WGen * \
+#              (K_WGen.value/(1))**order_WGen * \
               (kf_ewg_olig.value / kr_ewg_olig.value)**(sum([order_WGen + (order_WGen - 1)])))
     Parameter('ktr_en', 1)
 
     print (sum([order_WGen + (order_WGen - 1)]))
-    print kf_g_ewg.value
-    print kr_g_ewg.value
+    print (kf_g_ewg.value)
+    print (kr_g_ewg.value)
     K1 = kr_ewg_olig.value / kf_ewg_olig.value
     K2 = kr_g_ewg.value / kf_g_ewg.value
-    print (K1**((sum([order_WGen + (order_WGen - 1)])))*K2)**(1./order_WGen)# * H_en.value
-    print K_WGen.value
+    print (K1**((sum([order_WGen + (order_WGen - 1)])))*K2)**(1./order_WGen)
+    print (K_WGen.value / (H_EWG.value*H_wg.value))
 
     ## Doesn't currently work
     # reactants = []
@@ -356,6 +285,6 @@ def create_model(nu_wg, nu_cn):
     #Rule('mRNA_degradation', mEN() >> None, H_en)
 
     # Degradation rule
-    #Rule('en_degradation', en() >> None, H_en)
-    Rule('en_degradation', en() >> None, Parameter('endegtest',1))
-    print model.rules
+    Rule('en_degradation', en() >> None, H_en)
+    #Rule('en_degradation', en() >> None, Parameter('endegtest',1))
+    #print (model.rules)
