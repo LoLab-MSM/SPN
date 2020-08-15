@@ -2,18 +2,9 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_5_1_20,_4_06_PM_[Default_Changelist]/shelved.patch" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/shelf/Uncommitted_changes_before_Update_at_5_1_20__4_06_PM__Default_Changelist_.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/vcs.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/SPN_Ingenue.txt" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Testing/old_en.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Testing/old_run_en.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/anim.mp4" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/run_mass_action.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/SPN_mass_action.py" beforeDir="false" afterPath="$PROJECT_DIR$/SPN_mass_action.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Testing/en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/en.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Testing/en_Hill.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/en_Hill.py" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/old_en.py" beforeDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/old_run_en.py" beforeDir="false" />
       <change beforePath="$PROJECT_DIR$/Testing/run_en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/run_en.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -276,7 +267,7 @@
       <workItem from="1596487695352" duration="704000" />
       <workItem from="1596502465531" duration="9316000" />
       <workItem from="1597161083915" duration="13595000" />
-      <workItem from="1597354099022" duration="37795000" />
+      <workItem from="1597354099022" duration="38007000" />
     </task>
     <task id="LOCAL-00001" summary="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs.">
       <created>1589145890478</created>
@@ -285,7 +276,14 @@
       <option name="project" value="LOCAL" />
       <updated>1589145890478</updated>
     </task>
-    <option name="localTasksCounter" value="2" />
+    <task id="LOCAL-00002" summary="Updated engrailed mass action model, used characteristic concentrations in run_en in order to compare Hill equation vs mass-action outputs.">
+      <created>1597450117851</created>
+      <option name="number" value="00002" />
+      <option name="presentableId" value="LOCAL-00002" />
+      <option name="project" value="LOCAL" />
+      <updated>1597450117851</updated>
+    </task>
+    <option name="localTasksCounter" value="3" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -293,45 +291,48 @@
   </component>
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs." />
-    <option name="LAST_COMMIT_MESSAGE" value="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs." />
+    <MESSAGE value="Updated engrailed mass action model, used characteristic concentrations in run_en in order to compare Hill equation vs mass-action outputs." />
+    <option name="LAST_COMMIT_MESSAGE" value="Updated engrailed mass action model, used characteristic concentrations in run_en in order to compare Hill equation vs mass-action outputs." />
   </component>
   <component name="WindowStateProjectService">
-    <state x="101" y="6" width="1145" height="714" key="CommitChangelistDialog2" timestamp="1589145890350">
-      <screen x="72" y="27" width="1208" height="693" />
+    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2" timestamp="1597450117685">
+      <screen x="72" y="27" width="995" height="573" />
     </state>
     <state x="101" y="6" width="1145" height="714" key="CommitChangelistDialog2/72.27.1208.693@72.27.1208.693" timestamp="1589145890350" />
-    <state width="949" height="153" key="GridCell.Tab.0.bottom" timestamp="1597441889818">
+    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2/72.27.995.573@72.27.995.573" timestamp="1597450117685" />
+    <state width="949" height="153" key="GridCell.Tab.0.bottom" timestamp="1597450136111">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.bottom/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.bottom/72.27.568.453@72.27.568.453" timestamp="1597370369058" />
-    <state width="949" height="153" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
-    <state width="949" height="153" key="GridCell.Tab.0.center" timestamp="1597441889818">
+    <state width="949" height="153" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1597450136111" />
+    <state width="949" height="153" key="GridCell.Tab.0.center" timestamp="1597450136111">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.center/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.center/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="153" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
-    <state width="949" height="153" key="GridCell.Tab.0.left" timestamp="1597441889817">
+    <state width="949" height="153" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1597450136111" />
+    <state width="949" height="153" key="GridCell.Tab.0.left" timestamp="1597450136110">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.left/72.27.1208.693@72.27.1208.693" timestamp="1597369936151" />
     <state width="522" height="160" key="GridCell.Tab.0.left/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="153" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1597441889817" />
-    <state width="949" height="153" key="GridCell.Tab.0.right" timestamp="1597441889818">
+    <state width="949" height="153" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1597450136110" />
+    <state width="949" height="153" key="GridCell.Tab.0.right" timestamp="1597450136111">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.right/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.right/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="153" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1597441889818" />
+    <state width="949" height="153" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1597450136111" />
     <state x="466" y="6" width="415" height="661" key="RollbackChangesDialog" timestamp="1589062613779">
       <screen x="72" y="27" width="1208" height="693" />
     </state>
     <state x="466" y="6" width="415" height="661" key="RollbackChangesDialog/72.27.1208.693@72.27.1208.693" timestamp="1589062613779" />
-    <state x="274" y="88" width="800" height="556" key="Vcs.Push.Dialog.v2" timestamp="1589145901537">
-      <screen x="72" y="27" width="1208" height="693" />
+    <state x="238" y="56" width="800" height="556" key="Vcs.Push.Dialog.v2" timestamp="1597450120918">
+      <screen x="72" y="27" width="995" height="573" />
     </state>
     <state x="274" y="88" width="800" height="556" key="Vcs.Push.Dialog.v2/72.27.1208.693@72.27.1208.693" timestamp="1589145901537" />
+    <state x="238" y="56" key="Vcs.Push.Dialog.v2/72.27.995.573@72.27.995.573" timestamp="1597450120918" />
     <state x="72" y="27" width="617" height="693" key="find.popup" timestamp="1596060246034">
       <screen x="72" y="27" width="1208" height="693" />
     </state>
