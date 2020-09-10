@@ -357,7 +357,7 @@ def create_model(nu_wg, nu_ci, nu_cn):
               kf_wg_y.value * kcat.value / \
               (alpha_WGwg.value * kdeg_y.value)
               )
-
+ 
 
     Parameter('ktr_wg_y', alpha_contribution_wg_Y.value * \
                ktr_wg.value)

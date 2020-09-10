@@ -1,15 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <project version="4">
   <component name="ChangeListManager">
-    <list default="true" id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="">
-      <change afterPath="$PROJECT_DIR$/Testing/run_wg.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Testing/wg_Hill.py" afterDir="false" />
-      <change afterPath="$PROJECT_DIR$/Testing/wg_boolean.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Model_SPN.py" beforeDir="false" afterPath="$PROJECT_DIR$/Model_SPN.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Testing/en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/en.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Testing/mass_action_logic.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/mass_action_logic.py" afterDir="false" />
-      <change beforePath="$PROJECT_DIR$/Testing/run_en.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/run_en.py" afterDir="false" />
+    <list default="true" id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="Made wingless mass action model, comparing wingless Hill equation vs mass-action outputs; not quite equal at this time.">
       <change beforePath="$PROJECT_DIR$/Testing/wg.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/wg.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -305,7 +297,7 @@
       <workItem from="1599251618716" duration="641000" />
       <workItem from="1599496321339" duration="26861000" />
       <workItem from="1599581535172" duration="6774000" />
-      <workItem from="1599758158081" duration="1235000" />
+      <workItem from="1599758158081" duration="1355000" />
     </task>
     <task id="LOCAL-00001" summary="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs.">
       <created>1589145890478</created>
@@ -321,7 +313,14 @@
       <option name="project" value="LOCAL" />
       <updated>1597450117851</updated>
     </task>
-    <option name="localTasksCounter" value="3" />
+    <task id="LOCAL-00003" summary="Made wingless mass action model, comparing wingless Hill equation vs mass-action outputs; not quite equal at this time.">
+      <created>1599759437083</created>
+      <option name="number" value="00003" />
+      <option name="presentableId" value="LOCAL-00003" />
+      <option name="project" value="LOCAL" />
+      <updated>1599759437083</updated>
+    </task>
+    <option name="localTasksCounter" value="4" />
     <servers />
   </component>
   <component name="TypeScriptGeneratedFilesManager">
@@ -330,41 +329,46 @@
   <component name="VcsManagerConfiguration">
     <MESSAGE value="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs." />
     <MESSAGE value="Updated engrailed mass action model, used characteristic concentrations in run_en in order to compare Hill equation vs mass-action outputs." />
-    <option name="LAST_COMMIT_MESSAGE" value="Updated engrailed mass action model, used characteristic concentrations in run_en in order to compare Hill equation vs mass-action outputs." />
+    <MESSAGE value="Made wingless mass action model, comparing wingless Hill equation vs mass-action outputs; not quite equal at this time." />
+    <option name="LAST_COMMIT_MESSAGE" value="Made wingless mass action model, comparing wingless Hill equation vs mass-action outputs; not quite equal at this time." />
   </component>
   <component name="WindowStateProjectService">
-    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2" timestamp="1597450117685">
+    <state x="261" y="117" width="612" height="378" key="#Notifications" timestamp="1599759497734">
       <screen x="72" y="27" width="995" height="573" />
     </state>
-    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2/72.27.995.573@72.27.995.573" timestamp="1597450117685" />
+    <state x="261" y="117" width="612" height="378" key="#Notifications/72.27.995.573@72.27.995.573" timestamp="1599759497734" />
+    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2" timestamp="1599759510777">
+      <screen x="72" y="27" width="995" height="573" />
+    </state>
+    <state x="96" y="6" width="944" height="573" key="CommitChangelistDialog2/72.27.995.573@72.27.995.573" timestamp="1599759510777" />
     <state x="319" y="35" width="493" height="541" key="FileChooserDialogImpl" timestamp="1598399217100">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state x="319" y="35" width="493" height="541" key="FileChooserDialogImpl/72.27.995.573@72.27.995.573" timestamp="1598399217100" />
-    <state width="949" height="163" key="GridCell.Tab.0.bottom" timestamp="1599759354836">
+    <state width="949" height="163" key="GridCell.Tab.0.bottom" timestamp="1599759491168">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.bottom/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.bottom/72.27.568.453@72.27.568.453" timestamp="1597370369058" />
-    <state width="949" height="163" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1599759354836" />
-    <state width="949" height="163" key="GridCell.Tab.0.center" timestamp="1599759354836">
+    <state width="949" height="163" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
+    <state width="949" height="163" key="GridCell.Tab.0.center" timestamp="1599759491168">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.center/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.center/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1599759354836" />
-    <state width="949" height="163" key="GridCell.Tab.0.left" timestamp="1599759354835">
+    <state width="949" height="163" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
+    <state width="949" height="163" key="GridCell.Tab.0.left" timestamp="1599759491168">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.left/72.27.1208.693@72.27.1208.693" timestamp="1597369936151" />
     <state width="522" height="160" key="GridCell.Tab.0.left/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1599759354835" />
-    <state width="949" height="163" key="GridCell.Tab.0.right" timestamp="1599759354836">
+    <state width="949" height="163" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
+    <state width="949" height="163" key="GridCell.Tab.0.right" timestamp="1599759491168">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.right/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.right/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1599759354836" />
+    <state width="949" height="163" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
     <state x="72" y="6" width="991" height="594" key="SettingsEditor" timestamp="1598399220996">
       <screen x="72" y="27" width="995" height="573" />
     </state>
@@ -373,10 +377,10 @@
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="498" height="446" key="SwitcherDM/72.27.995.573@72.27.995.573" timestamp="1598398923898" />
-    <state x="238" y="56" width="800" height="556" key="Vcs.Push.Dialog.v2" timestamp="1597450120918">
+    <state x="238" y="35" width="800" height="556" key="Vcs.Push.Dialog.v2" timestamp="1599759439668">
       <screen x="72" y="27" width="995" height="573" />
     </state>
-    <state x="238" y="56" key="Vcs.Push.Dialog.v2/72.27.995.573@72.27.995.573" timestamp="1597450120918" />
+    <state x="238" y="35" width="800" height="556" key="Vcs.Push.Dialog.v2/72.27.995.573@72.27.995.573" timestamp="1599759439668" />
     <state x="72" y="27" width="617" height="693" key="find.popup" timestamp="1596060246034">
       <screen x="72" y="27" width="1208" height="693" />
     </state>
