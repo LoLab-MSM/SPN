@@ -159,6 +159,7 @@ Parameter('H_en', 1.0/56.195484)
 Parameter('K_CNen', 0.0015239986) #0.001523986
 Parameter('nu_CNen', 5.929026)
 Parameter('H_EN', 1.0/26.655169)
+
 Parameter('H_wg', 1.0/65.74263)
 Parameter('K_WGwg', 0.010839762)
 Parameter('nu_WGwg', 5.2690034)
@@ -168,6 +169,7 @@ Parameter('nu_CIwg', 3.0448556)
 Parameter('alpha_CIwg', 5.354691)
 Parameter('K_CNwg', 0.08410451)
 Parameter('nu_CNwg', 2.2106833)
+
 Parameter('H_IWG', 1.0/95.70869)
 Parameter('Endo_WG', 0.010213904) #/6)
 Parameter('Exo_WG', 0.36542872/6)

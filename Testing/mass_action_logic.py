@@ -2,7 +2,7 @@ from pysb import *
 from pysb.integrate import odesolve
 import numpy as np
 import matplotlib.pyplot as plt
-import wg
+import wg_boolean
 
 # wg' := (CIA and SLP and not CIR) or (wg and (CIA or SLP) and not CIR)
 # m' := (T1 and T2 and not R) or (m and (T1 or T2) and not R)
@@ -29,10 +29,10 @@ R_0 = 0
 P_0 = 0
 ###############
 
-wg.monomers()
-wg.initials(T1_0, T2_0, R_0, P_0)
-wg.rules(version=3)
-wg.observables()
+wg_boolean.monomers()
+wg_boolean.initials(T1_0, T2_0, R_0, P_0)
+wg_boolean.rules(version=3)
+wg_boolean.observables()
 
 # Monomer('G', ['t1', 't2', 'p', 'r', 'state'], {'state' : ['off', 'on']})
 # # Monomer('G', ['t1', 't2', 'p', 'r'])

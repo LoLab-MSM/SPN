@@ -31,8 +31,8 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
     tspan = np.linspace(0, 1000, 501)
     sim = ScipyOdeSimulator(model1, tspan, verbose=False)
     sim2 = ScipyOdeSimulator(model2, tspan, verbose=False, integrator_options = {'atol' : 1e-6, 'rtol' : 1e-6})
-    
-    n_samples = 100
+
+    n_samples = 10 #100
     #EWG_init = np.linspace(1./n_samples, 1, n_samples) #1
     #EWG_init = np.linspace(0,1,11) #[1]
     EWG_init = np.linspace(0.01, 1., n_samples)
@@ -49,7 +49,7 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
 
     for i,e in enumerate(EWG_init):
         for j,c in enumerate(CN_init):
-            # print('(%s, %g): %d.%d' % (nu_wg, nu_cn, i, j))
+            print('(%s, %g): %d.%d' % (nu_wg, nu_cn, i, j))
             # print (e)
             # print (c)
             # print (str(float((e/(H_EWG.value*H_wg.value))/(c/(H_CN.value*H_ci.value)))))
@@ -75,7 +75,6 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
             else:
                 en_final[i][j] = float('nan')
 
-    #sys.exit(0)
     plt.figure()
     if len(CN_init) == 1:
         plt.plot(pEWG_final, mEN_final, color='0.5', lw=2)

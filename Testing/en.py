@@ -17,17 +17,9 @@ def create_model(nu_wg, nu_cn):
     Parameter('H_wg', 1.0 / 65.74263)
     Parameter('H_WG', 1.0 / 95.70869)     #Parameter('H_IWG', 1.0 / 95.70869), Parameter('H_EWG', 1.0 / 47.52389)
     Parameter('H_EWG', 1.0 / 47.52389)
-    Parameter('ktr_wg', 1)
-    Parameter('ktl_WG', 1)
-    Parameter('kdeg_wg', 1)
-    Parameter('kdeg_WG', 1)
     Parameter('H_ci', 1.0 / 88.05598)
     Parameter('H_CI', 1.0 / 20.967995)  #Parameter('H_CI', 1.0 / 20.967995), Parameter('H_CN', 1.0 / 17.765957)
     Parameter('H_CN', 1.0 / 17.765957)
-    Parameter('ktr_ci', 1)
-    Parameter('ktl_CI', 1)
-    Parameter('kdeg_ci', 1)
-    Parameter('kdeg_CI', 1)
     #########################################
     
     ########### MECHANISTIC MODEL ###########
