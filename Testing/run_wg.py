@@ -33,9 +33,9 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
     sim2 = ScipyOdeSimulator(model2, tspan, verbose=False, integrator_options={'atol': 1e-6, 'rtol': 1e-6})
 
     #print ('MODEL 1: MA')
-    specdict = {}
-    for n,i in enumerate(model1.species):
-        specdict[n] = i
+    #specdict = {}
+    #for n,i in enumerate(model1.species):
+    #    specdict[n] = i
     #print (specdict)
     # repldict = {}
     # for n,i in enumerate(model1.odes):
@@ -55,14 +55,14 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
     #    print (i)
     #sys.exit(0)
 
-    # NEED TO FIGURE OUT THE RIGHT BOUNDS ETC SO CAN GET GOOD NUMBERS
-    n_samples = 5 #10 #100
+    n_samples = 30
     CI_init = np.linspace(0.01, 1., n_samples)
-    CN_init = np.linspace(0.001, .01, n_samples)
+    CN_init = np.linspace(0.1, .2, n_samples)
     IWG_init = np.linspace(0.01, 1, n_samples)
 
     mWG_final_CI_CN = np.zeros((len(CI_init), len(CN_init)))
     mWG_final_CI_IWG = np.zeros((len(CI_init), len(IWG_init)))
+    mWG_final_CN_IWG = np.zeros((len(CN_init), len(IWG_init)))
     pIWG_final_CI = np.zeros((len(IWG_init), len(CI_init)))
     pIWG_final_CN = np.zeros((len(IWG_init), len(CN_init)))
     pCN_final_CI = np.zeros((len(CN_init), len(CI_init)))
@@ -72,17 +72,12 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
 
     wg_final_CI_CN = np.zeros((len(CI_init), len(CN_init)))
     wg_final_CI_IWG = np.zeros((len(CI_init), len(IWG_init)))
+    wg_final_CN_IWG = np.zeros((len(CN_init), len(IWG_init)))
 
     for i, w in enumerate(IWG_init):
         for j, c in enumerate(CI_init):
             for k, cl in enumerate(CN_init):
                 print('(%s, %g, %g): %d.%d.%d' % (nu_wg, nu_cn, nu_ci, i, j, k))
-                #c = 0
-                #w = 0
-                # print (e)
-                # print (c)
-                # print (str(float((e/(H_EWG.value*H_wg.value))/(c/(H_CN.value*H_ci.value)))))
-                # this ratio (directly above) is about double the e to c ratio
                 # Simulate full model
                 x = sim.run(initials={model1.initial_conditions[2][0]: w / (H_IWG.value * H_wg.value), \
                                       model1.initial_conditions[0][0]: c / (H_CI.value * H_ci.value), \
@@ -90,11 +85,7 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
 
                 mWG = x.observables['mWng_obs']
                 scaled_mWG = x.observables['mWng_obs'] * H_wg.value
-                plt.plot(tspan,scaled_mWG,color='red')
-                #plt.plot(tspan[-3:], x.observables['gWng_boundby_A'][-3:]+x.observables['gWng_boundby_both'][-3:]+x.observables['gWng_boundby_Y'][-3:], color='red')
-                #plt.plot(tspan[-3:], x.observables['gWng_bound_total'][-3:], color='green', linestyle='--')
-                #plt.plot(tspan[-3:], x.observables['gWng_boundby_A'][-3:]+x.observables['gWng_boundby_Y'][-3:], color='blue', linestyle=':')
-                #plt.show()
+                #plt.plot(tspan,scaled_mWG,color='red')
                 pIWG = x.observables['pIWG_free']
                 scaled_pIWG = pIWG * (H_IWG.value * H_wg.value)  # H's are already divisors (see en.py)
                 pCN = x.observables['pCN_free']
@@ -105,6 +96,7 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
                 # exactly which one of these to use only matters for plotting
                 mWG_final_CI_CN[j][k] = scaled_mWG[-1]
                 mWG_final_CI_IWG[j][i] = scaled_mWG[-1]
+                mWG_final_CN_IWG[k][i] = scaled_mWG[-1]
                 pIWG_final_CI[i][j] = scaled_pIWG[-1]
                 pIWG_final_CI[i][k] = scaled_pIWG[-1]
                 pCN_final_CI[k][j] = scaled_pCN[-1]
@@ -119,61 +111,75 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
                                            model2.initial_conditions[3][0]: scaled_pCN[-1]})
                     wg_final_CI_CN[j][k] = x.observables['wg_obs'][-1]
                     wg_final_CI_IWG[j][i] = x.observables['wg_obs'][-1]
-                    plt.plot(tspan,x.observables['wg_obs'],color='green',linestyle='--')
-#                    plt.title(str(w)+','+str(c)+','+str(cl))
+                    wg_final_CN_IWG[k][i] = x.observables['wg_obs'][-1]
+                    #plt.plot(tspan,x.observables['wg_obs'],color='green',linestyle='--')
                     #plt.show()
                 else:
                     wg_final_CI_CN[j][k] = float('nan')
                     wg_final_CI_IWG[j][i] = float('nan')
-#                break
-#            break
-#        break
-    plt.show()
+                    wg_final_CN_IWG[k][i] = float('nan')
+    #plt.show()
 
-    # FIX THE BELOW LATER
-    # even though it was never super important to plot them one-dimensionally...
-
-    sys.exit(0)
     plt.figure()
-    if len(CN_init) == 1:
-        plt.plot(pEWG_final, mEN_final, color='0.5', lw=2)
-        #         plt.plot(EWG_init, mEN_final, color='0.5', lw=2)
-        idx = np.arange(0, len(EWG_init), int(len(EWG_init) / 100))
-        plt.plot(pEWG_final[idx], en_final[idx], 'o', label='nu_WGen = %g\nnu_CNen = %g' % (nu_wg, nu_cn))
-        #         plt.plot(EWG_init[idx], en_final[idx], 'o', label='nu_WGen = %g\nnu_CNen = %g' % (nu_wg,nu_cn))
-        plt.xlabel(r'[pEWG]$_\infty$ (scaled conc.)')
-        plt.ylabel(r'[mEN]$_\infty$ (scaled conc.)')
-        plt.xscale('log')
-        plt.legend(loc=0)
-    elif len(EWG_init) == 1:
-        plt.plot(pCN_final[0], mEN_final[0], color='0.5', lw=2)
-        #         plt.plot(CN_init, mEN_final[0], color='0.5', lw=2)
-        idx = np.arange(0, len(CN_init), int(len(CN_init) / 100))
-        plt.plot(pCN_final[0][idx], en_final[0][idx], 'o', label='nu_WGen = %g\nnu_CNen = %g' % (nu_wg, nu_cn))
-        #         plt.plot(CN_init[idx], en_final[0][idx], 'o', label='nu_WGen = %g\nnu_CNen = %g' % (nu_wg,nu_cn))
-        plt.xlabel(r'[pCN]$_\infty$ (scaled conc.)')
-        plt.ylabel(r'[mEN]$_\infty$ (scaled conc.)')
-        plt.xscale('log')
-        plt.legend(loc=0)
-    else:
-        cm = plt.pcolormesh(CN_init, EWG_init, mEN_final, vmin=0, vmax=1, cmap='bwr')
-        cm.get_cmap().set_bad('k')
-        plt.xlabel(r'[CN]$_0$ (scaled conc)')
-        plt.ylabel(r'[EWG]$_0$ (scaled conc)')
-        plt.xscale('log')
-        plt.yscale('log')
-        cb = plt.colorbar()
-        cb.ax.set_ylabel(r'[mEN]$_\infty$ (scaled conc)', labelpad=20)
-        #
-        plt.figure()
-        cm = plt.pcolormesh(CN_init, EWG_init, en_final, vmin=0, vmax=1, cmap='bwr')
-        cm.get_cmap().set_bad('k')
-        plt.xlabel(r'[CN]$_0$ (scaled conc)')
-        plt.ylabel(r'[EWG]$_0$ (scaled conc)')
-        plt.xscale('log')
-        plt.yscale('log')
-        cb = plt.colorbar()
-        cb.ax.set_ylabel(r'[en]$_\infty$ (scaled conc)', labelpad=20)
+    # CI, CN
+    cm = plt.pcolormesh(CI_init, CN_init, mWG_final_CI_CN, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CI]$_0$ (scaled conc)')
+    plt.ylabel(r'[CN]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[mWG]$_\infty$ (scaled conc)', labelpad=20)
+    #
+    plt.figure()
+    cm = plt.pcolormesh(CI_init, CN_init, wg_final_CI_CN, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CI]$_0$ (scaled conc)')
+    plt.ylabel(r'[CN]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[wg]$_\infty$ (scaled conc)', labelpad=20)
+    # CI, IWG
+    plt.figure()
+    cm = plt.pcolormesh(CI_init, IWG_init, mWG_final_CI_IWG, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CI]$_0$ (scaled conc)')
+    plt.ylabel(r'[IWG]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[mWG]$_\infty$ (scaled conc)', labelpad=20)
+    #
+    plt.figure()
+    cm = plt.pcolormesh(CI_init, IWG_init, wg_final_CI_IWG, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CI]$_0$ (scaled conc)')
+    plt.ylabel(r'[IWG]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[wg]$_\infty$ (scaled conc)', labelpad=20)
+    #CN, IWG
+    plt.figure()
+    cm = plt.pcolormesh(CN_init, IWG_init, mWG_final_CN_IWG, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CN]$_0$ (scaled conc)')
+    plt.ylabel(r'[IWG]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[mWG]$_\infty$ (scaled conc)', labelpad=20)
+    #
+    plt.figure()
+    cm = plt.pcolormesh(CN_init, IWG_init, wg_final_CN_IWG, vmin=0, vmax=1, cmap='bwr')
+    cm.get_cmap().set_bad('k')
+    plt.xlabel(r'[CN]$_0$ (scaled conc)')
+    plt.ylabel(r'[IWG]$_0$ (scaled conc)')
+    plt.xscale('log')
+    plt.yscale('log')
+    cb = plt.colorbar()
+    cb.ax.set_ylabel(r'[wg]$_\infty$ (scaled conc)', labelpad=20)
 plt.show()
 
 

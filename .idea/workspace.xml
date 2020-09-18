@@ -2,6 +2,8 @@
 <project version="4">
   <component name="ChangeListManager">
     <list default="true" id="309a4436-8d8d-4e4e-b04d-f50144272338" name="Default Changelist" comment="Made wingless mass action model, comparing wingless Hill equation vs mass-action outputs; not quite equal at this time.">
+      <change beforePath="$PROJECT_DIR$/.idea/workspace.xml" beforeDir="false" afterPath="$PROJECT_DIR$/.idea/workspace.xml" afterDir="false" />
+      <change beforePath="$PROJECT_DIR$/Testing/run_wg.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/run_wg.py" afterDir="false" />
       <change beforePath="$PROJECT_DIR$/Testing/wg.py" beforeDir="false" afterPath="$PROJECT_DIR$/Testing/wg.py" afterDir="false" />
     </list>
     <option name="SHOW_DIALOG" value="false" />
@@ -298,6 +300,11 @@
       <workItem from="1599496321339" duration="26861000" />
       <workItem from="1599581535172" duration="6774000" />
       <workItem from="1599758158081" duration="1355000" />
+      <workItem from="1599759660776" duration="1212000" />
+      <workItem from="1599765932775" duration="9366000" />
+      <workItem from="1599841963215" duration="3918000" />
+      <workItem from="1600291438378" duration="9200000" />
+      <workItem from="1600354575452" duration="5156000" />
     </task>
     <task id="LOCAL-00001" summary="Updated engrailed mass action model and made some changes to the engrailed Hill equation and run_en in order to compare Hill equation vs mass-action outputs.">
       <created>1589145890478</created>
@@ -345,30 +352,30 @@
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state x="319" y="35" width="493" height="541" key="FileChooserDialogImpl/72.27.995.573@72.27.995.573" timestamp="1598399217100" />
-    <state width="949" height="163" key="GridCell.Tab.0.bottom" timestamp="1599759491168">
+    <state width="949" height="133" key="GridCell.Tab.0.bottom" timestamp="1600388090457">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.bottom/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.bottom/72.27.568.453@72.27.568.453" timestamp="1597370369058" />
-    <state width="949" height="163" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
-    <state width="949" height="163" key="GridCell.Tab.0.center" timestamp="1599759491168">
+    <state width="949" height="133" key="GridCell.Tab.0.bottom/72.27.995.573@72.27.995.573" timestamp="1600388090457" />
+    <state width="949" height="133" key="GridCell.Tab.0.center" timestamp="1600388090456">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.center/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.center/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
-    <state width="949" height="163" key="GridCell.Tab.0.left" timestamp="1599759491168">
+    <state width="949" height="133" key="GridCell.Tab.0.center/72.27.995.573@72.27.995.573" timestamp="1600388090456" />
+    <state width="949" height="133" key="GridCell.Tab.0.left" timestamp="1600388090456">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.left/72.27.1208.693@72.27.1208.693" timestamp="1597369936151" />
     <state width="522" height="160" key="GridCell.Tab.0.left/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
-    <state width="949" height="163" key="GridCell.Tab.0.right" timestamp="1599759491168">
+    <state width="949" height="133" key="GridCell.Tab.0.left/72.27.995.573@72.27.995.573" timestamp="1600388090456" />
+    <state width="949" height="133" key="GridCell.Tab.0.right" timestamp="1600388090457">
       <screen x="72" y="27" width="995" height="573" />
     </state>
     <state width="1162" height="160" key="GridCell.Tab.0.right/72.27.1208.693@72.27.1208.693" timestamp="1597369936152" />
     <state width="522" height="160" key="GridCell.Tab.0.right/72.27.568.453@72.27.568.453" timestamp="1597370369057" />
-    <state width="949" height="163" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1599759491168" />
+    <state width="949" height="133" key="GridCell.Tab.0.right/72.27.995.573@72.27.995.573" timestamp="1600388090457" />
     <state x="72" y="6" width="991" height="594" key="SettingsEditor" timestamp="1598399220996">
       <screen x="72" y="27" width="995" height="573" />
     </state>
@@ -396,7 +403,7 @@
     <SUITE FILE_PATH="coverage/SPN$old_run_en.coverage" NAME="old_run_en Coverage Results" MODIFIED="1597422598903" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
     <SUITE FILE_PATH="coverage/SPN$run_en.coverage" NAME="run_en Coverage Results" MODIFIED="1598399472821" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
     <SUITE FILE_PATH="coverage/SPN$run_mass_action.coverage" NAME="run_mass_action Coverage Results" MODIFIED="1596061151073" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$" />
-    <SUITE FILE_PATH="coverage/SPN$run_wg.coverage" NAME="run_wg Coverage Results" MODIFIED="1599759354825" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
+    <SUITE FILE_PATH="coverage/SPN$run_wg.coverage" NAME="run_wg Coverage Results" MODIFIED="1600388090447" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
     <SUITE FILE_PATH="coverage/SPN$run_wng.coverage" NAME="run_wg Coverage Results" MODIFIED="1598047172693" SOURCE_PROVIDER="com.intellij.coverage.DefaultCoverageFileProvider" RUNNER="coverage.py" COVERAGE_BY_TEST_ENABLED="true" COVERAGE_TRACING_ENABLED="false" WORKING_DIRECTORY="$PROJECT_DIR$/Testing" />
   </component>
 </project>
