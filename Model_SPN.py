@@ -176,6 +176,7 @@ Parameter('Exo_WG', 0.36542872/6)
 Parameter('Mxfer_WG', 0.0014474009)
 Parameter('LMxfer_WG', 0.0012071289)
 Parameter('H_EWG', 1.0/47.52389)
+
 Parameter('K_CIptc', 0.0012549695)
 Parameter('nu_CIptc', 3.5400295)
 Parameter('H_ptc', 1.0/62.299126)
@@ -206,7 +207,7 @@ Parameter('H_HH', 1.0/28.393164)
 Parameter('H_HH_6th', 1.0/(6*28.393164))
 Parameter('LMxfer_HH', 0.010256403)
 Parameter('H_PH', 1.0/92.6156)
-Parameter("B", 0.4) # determines ci expression
+Parameter('B', 0.4) # determines ci expression
 
 # IC's'
 Initial(en_1(), Parameter('en_1_0', 0))

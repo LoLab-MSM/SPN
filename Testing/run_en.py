@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pysb.simulator import ScipyOdeSimulator
-import en
+#import en
+from full_model import model as model1
 from en_Hill import model as model2
 from itertools import product
 import sys
@@ -12,8 +13,8 @@ nu_CNen = [6] #[5.929026]
 for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
 #     print nu_wg, nu_cn
     
-    en.create_model(nu_wg, nu_cn)
-    model1 = en.model
+    #en.create_model(nu_wg, nu_cn)
+    #model1 = en.model
 
 
     model2.parameters['nu_WGen'].value = model1.parameters['nu_WGen'].value
@@ -22,7 +23,6 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
     H_en = model1.parameters['H_en']
     ktr_en = model1.parameters['ktr_en']
     H_wg = model1.parameters['H_wg']
-    H_WG = model1.parameters['H_WG']
     H_EWG = model1.parameters['H_EWG']
     H_ci = model1.parameters['H_ci']
     H_CI = model1.parameters['H_CI']
@@ -55,7 +55,7 @@ for nu_wg, nu_cn in product(nu_WGen, nu_CNen):
             # print (str(float((e/(H_EWG.value*H_wg.value))/(c/(H_CN.value*H_ci.value)))))
             # this ratio (directly above) is about double the e to c ratio
             # Simulate full model
-            x = sim.run(initials={model1.initial_conditions[0][0] : e / (H_EWG.value*H_wg.value), \
+            x = sim.run(initials={model1.initial_conditions[3][0] : e / (H_EWG.value*H_wg.value), \
                                   model1.initial_conditions[1][0] : c / (H_CN.value*H_ci.value)})
             mEN = x.observables['mEN_obs']
             scaled_mEN = x.observables['mEN_obs'] * H_en.value / ktr_en.value

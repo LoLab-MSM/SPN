@@ -1,7 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
 from pysb.simulator import ScipyOdeSimulator
-import wg
+#import wg
+from full_model import model as model1
 from wg_Hill import model as model2
 from itertools import product
 import sys
@@ -14,9 +15,10 @@ nu_CNwg = [2]  # [2.2106833]
 for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
     #print (nu_wg, nu_ci, nu_cn)
 
-    wg.create_model(nu_wg, nu_ci, nu_cn)
-    model1 = wg.model
+#    wg.create_model(nu_wg, nu_ci, nu_cn)
+#    model1 = wg.model
 
+    #sys.exit(0)
     model2.parameters['nu_WGwg'].value = model1.parameters['nu_WGwg'].value
     model2.parameters['nu_CIwg'].value = model1.parameters['nu_CIwg'].value
     model2.parameters['nu_CNwg'].value = model1.parameters['nu_CNwg'].value
@@ -53,9 +55,9 @@ for nu_wg, nu_ci, nu_cn in product(nu_WGwg, nu_CIwg, nu_CNwg):
     #     print ('')
     #for i in model1.reactions:
     #    print (i)
-    #sys.exit(0)
+    sys.exit(0)
 
-    n_samples = 30
+    n_samples = 15
     CI_init = np.linspace(0.01, 1., n_samples)
     CN_init = np.linspace(0.1, .2, n_samples)
     IWG_init = np.linspace(0.01, 1, n_samples)

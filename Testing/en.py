@@ -279,4 +279,4 @@ def create_model(nu_wg, nu_cn):
     # Degradation rule
     Rule('en_degradation', en() >> None, H_en)
     #Rule('en_degradation', en() >> None, Parameter('endegtest',1))
-    #print (model.rules)
+#    print (model.rules)
