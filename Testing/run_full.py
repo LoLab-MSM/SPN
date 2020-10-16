@@ -136,7 +136,7 @@ for nu_wgwg, nu_ci, nu_wgen, nu_cn in product(nu_WGwg, nu_CIwg, nu_WGen, nu_CNpt
                     scaled_mPTC = x.observables['mPTC_obs'] * H_ptc.value
                     mCI = x.observables['mCI_obs']
                     scaled_mCI = x.observables['mCI_obs'] * H_ci.value
-                    #plt.plot(tspan,scaled_mCI,color='red')
+                    plt.plot(tspan,scaled_mCI,color='red')
                     #
                     pEWG = x.observables['pEWG_free']
                     scaled_pEWG = pEWG * (H_EWG.value * H_wg.value)  # H's are already divisors (see en.py)
